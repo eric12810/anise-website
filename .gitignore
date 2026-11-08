@@ -1,0 +1,55 @@
+# Anise website: separate POS project, backups and deployment output
+/checkout-pos/
+/image-backups/
+/staging-build/
+/integration-preparation/
+
+# Environment variables, credentials and private keys
+.env
+.env.*
+*.env
+*.env.*
+!.env.example
+!.env.template
+!*.env.example
+!*.env.template
+secrets.json
+secrets.*.json
+credentials.json
+credentials.*.json
+client_secret*.json
+*.key
+*.pem
+*.p12
+*.pfx
+*.publishsettings
+*.pubxml
+*.pubxml.user
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.local.json
+
+# .NET generated output and per-user settings
+[Bb]in/
+[Oo]bj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+TestResults/
+
+# macOS and editor temporary files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.vscode/
+*.swp
+*.swo
+*~
+
+# Large local font used by the preview page
+/ComputerGrassRunning.ttf

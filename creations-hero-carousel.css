@@ -1,0 +1,52 @@
+.mock-creations{color:#3f4b3a}.mock-creations:before{display:block}.mock-hero{padding:150px 8% 80px;display:grid;grid-template-columns:.9fr 1.1fr;gap:7%;align-items:center;min-height:760px}.mock-hero-copy{padding-left:7%;max-width:520px}.mock-hero h1{font:400 clamp(68px,7vw,108px)/.96 var(--sans);letter-spacing:-.06em;margin:0;color:#a88a54}.mock-hero h1 em{font-family:var(--serif);font-weight:400;color:#87a854}.mock-lead{font:21px/1.6 var(--sans);color:#a88a54;max-width:350px;margin:30px 0}.mock-hero .text-link{color:#53634d}.mock-hero-image{height:560px;position:relative}.mock-hero-image img{object-fit:cover}.mock-hero-image:after{content:'';position:absolute;inset:13px;border:1px solid rgba(255,255,255,.7);pointer-events:none}.mock-hero-image span{position:absolute;bottom:26px;left:30px;color:white;text-transform:uppercase;letter-spacing:.14em;font-size:12px;z-index:1}.mock-intro{padding:130px 13%;background:#f7f8f2;display:grid;grid-template-columns:1fr 1fr;gap:12%}.mock-intro h2,.mock-section-head h2{font-size:clamp(48px,5vw,72px);line-height:1.05}.mock-intro-copy{color:#9a8050;font:19px/1.75 var(--sans)}.mock-intro-copy p:first-child{margin-top:0}.mock-intro-copy p:last-child{margin-bottom:0}.mock-collection{padding:130px 8% 100px}.mock-section-head{display:flex;flex-direction:column;align-items:flex-start;gap:22px;margin-bottom:65px}.mock-section-head>p{max-width:600px;color:#a88a54;font:18px/1.7 var(--sans);margin:0}.mock-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:70px 30px}.mock-dish-large{grid-column:span 2}.mock-photo{height:330px;overflow:hidden;background:#f1f2eb}.mock-dish-large .mock-photo{height:510px}.mock-offset{align-self:end}.mock-photo img{transition:transform .7s}.mock-dish:hover img{transform:scale(1.03)}.mock-dish-title{display:flex;gap:18px;align-items:baseline;margin-top:22px}.mock-dish-title span{color:#a88a54;font-size:13px;letter-spacing:.12em}.mock-dish h3{font:400 31px/1.12 var(--sans);color:#718e50;margin:0}.mock-dish>p{color:#a88a54;font:17px/1.5 var(--sans);margin:12px 0 0}.mock-note{margin:65px 0 0;color:#7c8475;font-size:13px}.mock-creations .philosophy-closing{background:#f7f8f2}@media(max-width:900px){.mock-hero{padding:125px 7% 65px;min-height:0}.mock-hero-copy{padding-left:0}.mock-hero-image{height:440px}.mock-intro{padding:90px 8%;gap:7%}.mock-grid{gap:50px 20px}.mock-photo{height:250px}.mock-dish-large .mock-photo{height:390px}}@media(max-width:600px){.mock-hero{grid-template-columns:1fr;gap:35px;padding:130px 8% 65px}.mock-hero h1{font-size:67px}.mock-hero-image{height:370px}.mock-intro{grid-template-columns:1fr;gap:24px;padding:75px 8%}.mock-intro h2,.mock-section-head h2{font-size:46px}.mock-intro-copy{font-size:18px}.mock-collection{padding:80px 8%}.mock-section-head{display:block;margin-bottom:40px}.mock-section-head>p{margin-top:22px}.mock-grid{grid-template-columns:1fr 1fr;gap:42px 18px}.mock-dish-large{grid-column:span 2}.mock-dish-large .mock-photo{height:330px}.mock-photo{height:200px}.mock-dish h3{font-size:23px}.mock-dish-title{gap:10px}.mock-dish>p{font-size:15px;margin-left:0}.mock-note{margin-top:45px}}
+.hero-carousel{height:560px;position:relative;background:#e9ede5;overflow:hidden}.hero-carousel-slide{position:absolute;inset:0}.hero-carousel-slide[hidden]{display:none}.hero-carousel-slide:after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,rgba(20,31,20,.68),transparent 52%);pointer-events:none}.hero-carousel-slide img{object-fit:cover}.hero-carousel:after{content:'';position:absolute;inset:13px;border:1px solid rgba(255,255,255,.65);pointer-events:none}.hero-carousel-caption{position:absolute;z-index:1;left:30px;bottom:35px;right:175px;color:white}.hero-carousel-caption span{display:block;font-size:12px;letter-spacing:.15em;text-transform:uppercase;margin-bottom:10px}.hero-carousel-caption strong{font:italic 30px/1.1 var(--serif)}.hero-carousel-controls{position:absolute;z-index:2;right:27px;bottom:30px;display:flex;align-items:center;gap:10px;color:white}.hero-carousel-controls button{display:grid;place-items:center;padding:0;border:1px solid rgba(255,255,255,.8);border-radius:50%;background:rgba(20,30,20,.15);color:#fff;width:42px;height:42px;font:22px var(--sans);cursor:pointer}.hero-carousel-controls button:hover{background:white;color:#405038}.hero-count{font-size:11px;letter-spacing:.08em}@media(max-width:900px){.hero-carousel{height:440px}}@media(max-width:600px){.hero-carousel{height:370px}.hero-carousel-caption{right:30px;bottom:95px}.hero-carousel-caption strong{font-size:26px}.hero-carousel-controls{left:30px;right:auto;bottom:30px}}
+/* Full-width, image-led hero slideshow. */
+.mock-hero{position:relative;display:block;min-height:720px;height:min(850px,100svh);padding:0;overflow:hidden;background:#26352b}.mock-hero-copy{position:absolute;z-index:2;left:10%;top:50%;transform:translateY(-42%);padding:0;width:min(500px,70%);color:#fff}.mock-hero-copy .eyebrow{color:#ead9ad}.mock-hero h1,.mock-hero h1 em{color:#fff}.mock-hero .mock-lead{color:#fff}.mock-hero .text-link{color:#fff;border-color:#ead9ad}.hero-carousel{position:absolute;inset:0;height:100%}.hero-carousel:after{inset:18px;border-color:rgba(255,255,255,.35)}.hero-carousel-slide:after{background:linear-gradient(90deg,rgba(22,35,25,.76),rgba(22,35,25,.24) 65%,rgba(22,35,25,.1)),linear-gradient(0deg,rgba(20,31,20,.45),transparent 38%)}.hero-carousel-caption{left:auto;right:10%;bottom:70px;max-width:300px;text-align:right}.hero-carousel-controls{right:10%;bottom:25px}.site-header{background:rgba(255,255,255,.97)}@media(max-width:900px){.mock-hero{height:760px;min-height:650px}.mock-hero-copy{left:8%;width:75%}}@media(max-width:600px){.mock-hero{height:calc(100svh - 0px);min-height:660px;padding:0}.mock-hero-copy{left:8%;top:43%;width:84%;transform:translateY(-40%)}.mock-hero h1{font-size:62px}.hero-carousel{height:100%}.hero-carousel:after{inset:10px}.hero-carousel-caption{left:8%;right:8%;bottom:90px;text-align:left}.hero-carousel-controls{left:8%;right:auto;bottom:30px}}
+
+/* Keep the tree visible above the page backgrounds. */
+.mock-creations:before{z-index:1}
+.mock-creations .mock-hero-copy,.mock-creations .mock-intro>* ,.mock-creations .mock-collection>* ,.mock-creations .philosophy-closing>*{position:relative;z-index:2}
+
+.mock-creations .hero-carousel-caption{position:absolute;z-index:2}
+
+/* Reserve a separate row above the mobile carousel controls. */
+@media(max-width:600px){.mock-creations .hero-carousel-caption{position:absolute;bottom:100px}}
+
+/* Keep mobile dish images and titles aligned across each row. */
+@media(max-width:600px){.mock-grid{align-items:start}.mock-offset{align-self:start}}
+
+/* Start the regular dishes below the featured dish on desktop. */
+@media(min-width:601px){.mock-dish-large + .mock-dish{grid-column:1;align-self:start}}
+
+button.mock-photo { display: block; width: 100%; border: 0; padding: 0; cursor: zoom-in; }
+.dish-preview {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.dish-preview[open] { display: grid; place-items: center; }
+.dish-preview::backdrop { background: rgba(18, 24, 19, .88); }
+.dish-preview img { width: auto; height: auto; max-width: 96vw; max-height: 92dvh; object-fit: contain; }
+.preview-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border: 1px solid white;
+  border-radius: 50%;
+  background: #253327;
+  color: white;
+  font-size: 28px;
+  cursor: pointer;
+}
+
+/* Give desktop dish names room above the carousel controls. */
+@media(min-width:901px){.mock-creations .hero-carousel-caption{bottom:100px;max-width:80%;width:max-content}}

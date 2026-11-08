@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 110" fill="none">
+  <!-- A single, nearly level brush pass: loaded at the left and thinning to a dry point at the right. -->
+  <path d="M20 61c24-13 47-22 81-27 37-6 76-4 116-1l367 15c117 5 200-5 290-14 32-3 61-4 91-5-24 7-44 14-71 20-88 20-191 26-315 20L207 52c-58-2-112 2-160 17-17 5-28 4-34 0-4-2-2-5 7-8Z" fill="#8BBE3F"/>
+  <path d="M42 56c36-12 83-16 137-13l378 17c115 5 196-3 290-15-76 17-171 26-280 22L174 49c-51-1-93 4-132 12Z" fill="#A9D36C" opacity=".7"/>
+  <path d="M25 72c46-17 103-23 163-22l354 12c133 5 224-6 336-25-83 20-172 35-292 31L194 58c-61-2-112 4-169 21Z" fill="#78A938" opacity=".5"/>
+  <path d="M35 48c42-16 84-22 139-20 62 2 116 8 180 10" stroke="#8BBE3F" stroke-width="4" stroke-linecap="round" opacity=".76"/>
+  <path d="M383 70c91 5 171 5 246 0 76-5 143-14 215-30 41-9 78-15 125-20" stroke="#8BBE3F" stroke-width="2.2" stroke-linecap="round" opacity=".68"/>
+  <path d="M843 24c42-9 86-15 137-17" stroke="#8BBE3F" stroke-width="1.2" stroke-linecap="round" opacity=".48"/>
+  <path d="m15 57 14-5m27 24 18-6m239-29 24 1m-41 22 19 1" stroke="#8BBE3F" stroke-width="2" stroke-linecap="round" opacity=".48"/>
+</svg>
