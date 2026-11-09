@@ -1,0 +1,56 @@
+name: Staging FTPS read-only check
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - .github/workflows/staging-ftps-check.yml
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  check:
+    if: github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify encrypted connection and list staging directory
+        env:
+          FTPS_HOST: ${{ secrets.STAGING_FTPS_HOST }}
+          FTPS_USERNAME: ${{ secrets.STAGING_FTPS_USERNAME }}
+          FTPS_PASSWORD: ${{ secrets.STAGING_FTPS_PASSWORD }}
+        run: |
+          python3 - <<'PY'
+          import ftplib
+          import os
+          import ssl
+          import sys
+
+          values = [os.environ.get(k, "") for k in
+                    ("FTPS_HOST", "FTPS_USERNAME", "FTPS_PASSWORD")]
+          if not all(values):
+              sys.exit("Missing FTPS secret. Check repository Actions secrets.")
+          host, username, password = values
+          if host.lower() != "wsuk32.pronameserver.com" or username != "stagesiteftp":
+              sys.exit("Host or username does not match the confirmed staging account.")
+          try:
+              ftp = ftplib.FTP_TLS(context=ssl.create_default_context(), timeout=25)
+              ftp.connect(host, 21)
+              ftp.login(username, password)
+              ftp.prot_p()
+              ftp.cwd("/stagesiteftp/wwwroot")
+              current = ftp.pwd()
+              if current.rstrip("/") != "/stagesiteftp/wwwroot":
+                  sys.exit("Server returned an unexpected directory; check path mapping.")
+              entries = ftp.nlst()
+              print("Verified TLS login and staging directory.")
+              print("Directory entries:")
+              for entry in sorted(entries):
+                  print(repr(entry))
+              ftp.quit()
+          except (OSError, ftplib.Error) as exc:
+              print("Connection or read-only directory check failed:", type(exc).__name__)
+              sys.exit(1)
+          print("Read-only check complete; no files uploaded, changed or deleted.")
+          PY
