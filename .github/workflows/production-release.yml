@@ -23,9 +23,12 @@ jobs:
       - name: Verify selected release and production destination
         env:
           PROD_FTPS_EXPECTED_HOST: ${{ secrets.LIVE_FTPS_HOST }}
-          PROD_FTPS_EXPECTED_ROOT: /livesiteftp/wwwroot
+          PROD_FTPS_EXPECTED_ROOT: ${{ secrets.LIVE_FTPS_ROOT }}
           PROD_FTPS_USERNAME: ${{ secrets.LIVE_FTPS_USERNAME }}
           PROD_FTPS_PASSWORD: ${{ secrets.LIVE_FTPS_PASSWORD }}
+          STAGING_FTPS_HOST: ${{ secrets.STAGING_FTPS_HOST }}
+          STAGING_FTPS_USERNAME: stagesiteftp
+          STAGING_FTPS_ROOT: /stagesiteftp/wwwroot
           STAGING_RUN_ID: ${{ inputs.staging_run_id }}
           COMMIT_SHA: ${{ steps.resolve.outputs.commit_sha }}
           MODE: ${{ inputs.mode }}
