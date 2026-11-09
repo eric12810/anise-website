@@ -164,7 +164,7 @@ async function refresh() {
   }
   loading = true; refreshButton.disabled = true;
   try {
-    const response = await fetch('https://pos-staging.loveanise.co.uk/api/website/orders/status', {
+    const response = await fetch(window.AnisePos.api + '/api/website/orders/status', {
       method:'POST', headers:{'Content-Type':'application/json'}, credentials:'omit', cache:'no-store',
       body:JSON.stringify({requestId: token}), signal:AbortSignal.timeout(12000)
     });
