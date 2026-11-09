@@ -31,7 +31,7 @@ jobs:
           FTPS_PASSWORD: ${{ secrets.STAGING_FTPS_PASSWORD }}
         run: |
           python3 - <<'PY'
-          import ftplib, hashlib, os, pathlib, re, ssl, subprocess, sys
+          import ftplib, hashlib, os, pathlib, re, ssl, subprocess, sys, tempfile
 
           root = pathlib.Path.cwd()
           names = """index.html menu.html order.html order-status.html philosophy.html
@@ -85,8 +85,20 @@ jobs:
                           ftp.cwd(component)
                   phase = "uploading " + n
                   print("Starting", n, flush=True)
-                  with open(n, "rb") as source:
-                      ftp.storbinary("STOR " + parts[-1], source, blocksize=32768)
+                  phase = "uploading " + n
+                  credentials = user + ":" + password
+                  escaped = credentials.replace("\\", "\\\\").replace('"', '\\\"').replace("\n", "\\n").replace("\r", "\\r")
+                  remote = target.rstrip("/") + "/" + "/".join(parts)
+                  with tempfile.NamedTemporaryFile() as config:
+                      config.write(('user = "' + escaped + '"\\n').encode())
+                      config.flush()
+                      result = subprocess.run([
+                          "curl", "--silent", "--show-error", "--fail", "--ssl-reqd",
+                          "--connect-timeout", "30", "--max-time", "180", "--config", config.name,
+                          "--upload-file", n, "ftp://" + host + ":21/" + remote.lstrip("/")
+                      ], capture_output=True, text=True)
+                  if result.returncode:
+                      raise RuntimeError("curl upload failed with exit code " + str(result.returncode))
                   print("Uploaded", n, flush=True)
               ftp.quit()
           except (OSError, ftplib.Error) as exc:
