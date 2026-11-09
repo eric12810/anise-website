@@ -20,7 +20,7 @@ def verify_bundle(bundle, staging_run_id=None, commit_sha=None):
         path = bundle / name
         if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
             raise ValueError("Release SHA-256 verification failed")
-        if b'https://pos-staging.loveanise.co.uk/api' in path.read_bytes() and name not in {'pos-environment.js', 'dish-thumbnail.ashx'}:
+        if b'pos-staging.loveanise.co.uk' in path.read_bytes() and name not in {'pos-environment.js', 'dish-thumbnail.ashx'}:
             raise ValueError("Production release contains a staging POS reference")
     record = json.loads((bundle / "staging-deployment-record.json").read_text())
     if record.get('status') != 'verified' or record.get('run_id') != str(staging_run_id) or record.get('commit_sha') != commit_sha or record.get('artifact_name') != 'anise-website-staging-release-'+commit_sha:
