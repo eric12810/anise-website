@@ -26,13 +26,21 @@ def verify_bundle(bundle, staging_run_id=None, commit_sha=None):
 
 def check_settings(host, root, require_credentials):
     if not EXPECTED_HOST or not EXPECTED_ROOT:
-        raise ValueError("Production host/root approval is not configured")
+        raise ValueError("Production FTPS host/root secrets are missing")
     if host != EXPECTED_HOST or root != EXPECTED_ROOT:
         raise ValueError("Production host or exact remote root is not approved")
-    if host in {"wsuk32.pronameserver.com", ""} or "staging" in root.lower():
-        raise ValueError("Staging target or empty production target refused")
-    if require_credentials and (not os.environ.get("PROD_FTPS_USERNAME") or not os.environ.get("PROD_FTPS_PASSWORD")):
-        raise ValueError("Separate production FTPS credentials are required")
+    username = os.environ.get("PROD_FTPS_USERNAME", "")
+    if not username:
+        raise ValueError("Production FTPS username secret is missing")
+    staging_host = os.environ.get("STAGING_FTPS_HOST", "")
+    staging_username = os.environ.get("STAGING_FTPS_USERNAME", "stagesiteftp")
+    staging_root = os.environ.get("STAGING_FTPS_ROOT", "/stagesiteftp/wwwroot")
+    if root == staging_root or username == staging_username or (staging_host and host == staging_host and root == staging_root):
+        raise ValueError("Production FTPS account/root overlaps the staging destination")
+    if "staging" in root.lower() or not root.startswith("/"):
+        raise ValueError("Production remote root is invalid or targets staging")
+    if require_credentials and not os.environ.get("PROD_FTPS_PASSWORD"):
+        raise ValueError("Production FTPS password secret is missing")
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--bundle", required=True); ap.add_argument("--staging-run-id", required=True); ap.add_argument("--commit-sha", required=True); ap.add_argument("--host", required=True); ap.add_argument("--root", required=True); ap.add_argument("--mode", choices=("check", "deploy"), default="check")
