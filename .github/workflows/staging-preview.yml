@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: anise-staging-deployment
+  cancel-in-progress: true
+
 jobs:
   preview:
     if: github.ref == 'refs/heads/staging'
@@ -21,9 +25,23 @@ jobs:
           python3 -m unittest discover -s tests/deployment -v
           python3 scripts/website-staging-deploy.py --preview
           PYTHONPATH=scripts RELEASE_VERSION="${GITHUB_SHA}" python3 scripts/release-artifact.py
+      - name: Deploy exact complete package to staging
+        env:
+          FTPS_HOST: ${{ secrets.STAGING_FTPS_HOST }}
+          FTPS_USERNAME: ${{ secrets.STAGING_FTPS_USERNAME }}
+          FTPS_PASSWORD: ${{ secrets.STAGING_FTPS_PASSWORD }}
+        run: python3 scripts/website-staging-deploy.py --upload
+      - name: Verify staging deployment and record evidence
+        run: |
+          curl --fail --silent --show-error --max-time 20 https://www.staging.loveanise.co.uk/ > /dev/null
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          Path('artifacts/website-release/staging-deployment-record.json').write_text(json.dumps({'status':'verified','run_id':os.environ['GITHUB_RUN_ID'],'commit_sha':os.environ['GITHUB_SHA'],'artifact_name':'anise-website-staging-release-'+os.environ['GITHUB_SHA']}, sort_keys=True)+'\n')
+          PY
       - uses: actions/upload-artifact@v4
         with:
-          name: anise-website-staging-${{ github.sha }}
+          name: anise-website-staging-release-${{ github.sha }}
           path: artifacts/website-release
           if-no-files-found: error
           retention-days: 90

@@ -9,7 +9,7 @@ def get(path):
 run=get('/actions/runs/'+run_id)
 if run.get('repository',{}).get('full_name') != repo or run.get('head_branch') != 'staging' or run.get('status') != 'completed' or run.get('conclusion') != 'success': raise SystemExit('Run is not a successful staging run for this repository')
 workflow=get('/actions/workflows/'+str(run.get('workflow_id')))
-if workflow.get('path') != '.github/workflows/staging-upload.yml': raise SystemExit('Run is not the approved staging release workflow')
+if workflow.get('path') != '.github/workflows/staging-preview.yml' or workflow.get('name') != 'Staging file preview': raise SystemExit('Run is not the approved automatic staging release workflow')
 expected='anise-website-staging-release-'+run.get('head_sha','')
 matches=[a for a in get('/actions/runs/'+run_id+'/artifacts').get('artifacts',[]) if a.get('name') == expected and not a.get('expired')]
 if len(matches) != 1: raise SystemExit('Expected one non-expired staging release artifact; found '+str(len(matches)))
