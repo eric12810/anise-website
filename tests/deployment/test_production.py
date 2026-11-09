@@ -13,6 +13,16 @@ class ProductionGuardTests(unittest.TestCase):
             (root/'release-manifest.json').write_text(json.dumps({'files': {'index.html': '0'*64}}))
             (root/'staging-deployment-record.json').write_text('{}')
             with self.assertRaises(ValueError): production.verify_bundle(root, '1', 'a'*40)
+
+    def test_production_bundle_rejects_staging_pos_reference(self):
+        commit = 'b' * 40
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); content = b"fetch('https://pos-staging.loveanise.co.uk/api/menu')"
+            (root/'order.js').write_bytes(content)
+            (root/'release-manifest.json').write_text(json.dumps({'files': {'order.js': __import__('hashlib').sha256(content).hexdigest()}}))
+            (root/'staging-deployment-record.json').write_text(json.dumps({'status':'verified','run_id':'1','commit_sha':commit,'artifact_name':'anise-website-staging-release-'+commit}))
+            with self.assertRaisesRegex(ValueError, 'staging POS'):
+                production.verify_bundle(root, '1', commit)
     def test_missing_approval_is_rejected(self):
         with mock.patch.object(production, 'EXPECTED_HOST', ''), mock.patch.object(production, 'EXPECTED_ROOT', ''):
             with self.assertRaisesRegex(ValueError, 'host/root secrets'):
@@ -33,6 +43,12 @@ class ProductionGuardTests(unittest.TestCase):
             self.assertIn('${{ secrets.' + name + ' }}', workflow)
         self.assertNotIn('vars.PROD_FTPS_HOST', workflow)
         self.assertNotIn('vars.PROD_FTPS_ROOT', workflow)
+
+    def test_pos_environment_mapping_is_explicit_and_complete(self):
+        config = (Path(__file__).parents[2] / 'pos-environment.js').read_text()
+        self.assertIn("'www.loveanise.co.uk': 'https://pos.loveanise.co.uk'", config)
+        self.assertIn("'www.staging.loveanise.co.uk': 'https://pos-staging.loveanise.co.uk'", config)
+        self.assertIn('Unsupported Anise website host', config)
 
     def test_check_mode_verifies_without_connecting(self):
         commit = 'a' * 40

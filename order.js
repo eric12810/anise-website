@@ -1,8 +1,8 @@
 // Refresh original photos and thumbnails when a new menu page is loaded.
 const menuImageRevision = Date.now().toString();
 function menuPhotoUrl(path) {
-  const url = new URL(path, "https://pos-staging.loveanise.co.uk/");
-  if (url.origin === "https://pos-staging.loveanise.co.uk") url.searchParams.set("v", menuImageRevision);
+  const url = new URL(path, window.AnisePos.api + "/");
+  if (url.origin === window.AnisePos.api) url.searchParams.set("v", menuImageRevision);
   return url.href;
 }
 const list = document.querySelector('#dish-list');
@@ -51,7 +51,7 @@ async function refreshItemDiscounts() {
   const orderType = document.querySelector('.fulfilment button.selected').textContent.trim();
   itemDiscounts = new Map(); updateDishPrices();
   try {
-    const response = await fetch('https://pos-staging.loveanise.co.uk/api/website/item-discounts', {
+    const response = await fetch(window.AnisePos.api + '/api/website/item-discounts', {
       method: 'POST', credentials: 'omit', cache: 'no-store', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ orderType, isReturningCustomer: window.AnisePromotionCookie.isReturning() }), signal: AbortSignal.timeout(12000)
     });
@@ -156,7 +156,7 @@ async function loadMenu() {
       categories = window.aniseLocalMenuPreview;
       document.querySelector('.mockup-notice').textContent = 'Local preview using a saved menu. Prices and availability may change; orders cannot be placed yet.';
     } else {
-      const response = await fetch('https://pos-staging.loveanise.co.uk/api/menu', {cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(12000)});
+      const response = await fetch(window.AnisePos.api + '/api/menu', {cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(12000)});
       if (!response.ok) throw new Error('Menu unavailable');
       categories = await response.json();
     }
@@ -351,7 +351,7 @@ document.querySelector('#apply-promo').addEventListener('click', async () => {
   appliedPromo = null;
   promoResult.textContent = 'Checking code…';
   try {
-    const response = await fetch('https://pos-staging.loveanise.co.uk/api/website/promo-quote', { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }), signal: AbortSignal.timeout(12000) });
+    const response = await fetch(window.AnisePos.api + '/api/website/promo-quote', { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code }), signal: AbortSignal.timeout(12000) });
     const result = await response.json();
     if (promoInput.value.trim().toUpperCase() !== code) return;
     if (!response.ok) throw new Error(result.message || 'Could not check this code. Please try again.');
@@ -416,7 +416,7 @@ async function refreshPotentialOffer() {
     isReturningCustomer: window.AnisePromotionCookie.isReturning(),
     lines:[...selected.values()].map(item => ({variantId:item.variantId,quantity:item.quantity,modifierIds:item.modifiers.map(m => m.id),notes:item.notes})) };
   try {
-    const response = await fetch('https://pos-staging.loveanise.co.uk/api/website/offer-quote', {method:'POST',credentials:'omit',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(12000)});
+    const response = await fetch(window.AnisePos.api + '/api/website/offer-quote', {method:'POST',credentials:'omit',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(12000)});
     if (!response.ok) return;
     const result = await response.json();
     if (sequence !== potentialSequence || !checkoutDialog.open || checkingOffer) return;
@@ -531,7 +531,7 @@ async function checkDeliveryAvailability() {
   button.disabled = true;
   deliveryResult.textContent = 'Checking delivery availability…';
   try {
-    const response = await fetch('https://pos-staging.loveanise.co.uk/api/website/delivery-quote', {
+    const response = await fetch(window.AnisePos.api + '/api/website/delivery-quote', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, credentials: 'omit',
       body: JSON.stringify({postcode: deliveryPostcode.value.trim()}), signal: AbortSignal.timeout(12000)
     });
@@ -598,7 +598,7 @@ const checkoutSubmit = checkoutForm.querySelector('button[type="submit"]');
 const pendingKey = 'anise.pendingCashOrder';
 const pendingCardKey = 'anise.pendingCardOrder';
 let cardAvailable = false;
-fetch('https://pos-staging.loveanise.co.uk/api/website/card-availability', {method:'POST',credentials:'omit',signal:AbortSignal.timeout(12000)}).then(r => r.ok ? r.json() : {}).then(result => { cardAvailable = result.available === true; updateCheckoutPayment(); }).catch(() => {});
+fetch(window.AnisePos.api + '/api/website/card-availability', {method:'POST',credentials:'omit',signal:AbortSignal.timeout(12000)}).then(r => r.ok ? r.json() : {}).then(result => { cardAvailable = result.available === true; updateCheckoutPayment(); }).catch(() => {});
 const trackingKey = 'anise.currentOrderStatus';
 const tracking = document.createElement('p');
 tracking.setAttribute('role', 'status');
@@ -622,7 +622,7 @@ async function refreshOrderStatus() {
   trackingLink.hidden = false;
   tracking.hidden = false;
   try {
-    const response = await fetch('https://pos-staging.loveanise.co.uk/api/website/orders/status', {
+    const response = await fetch(window.AnisePos.api + '/api/website/orders/status', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, credentials: 'omit', cache: 'no-store',
       body: JSON.stringify({requestId: saved.requestId}), signal: AbortSignal.timeout(12000)
     });
@@ -698,12 +698,12 @@ checkoutForm.addEventListener('submit', async event => {
   potentialSequence++;
   checkingOffer = true; checkoutSubmit.disabled = true; checkoutStatus.textContent = 'Checking your best available offer…';
   try {
-    let response = await fetch('https://pos-staging.loveanise.co.uk/api/website/offer-quote', { method:'POST', credentials:'omit', headers:{'Content-Type':'application/json'}, body:JSON.stringify(quoteRequest), signal:AbortSignal.timeout(12000) });
+    let response = await fetch(window.AnisePos.api + '/api/website/offer-quote', { method:'POST', credentials:'omit', headers:{'Content-Type':'application/json'}, body:JSON.stringify(quoteRequest), signal:AbortSignal.timeout(12000) });
     let quote = await response.json().catch(() => ({}));
     let unavailableCode = null;
     if (!response.ok && quote.code === 'promo_unavailable' && data.promoCode) {
       unavailableCode = quote.message || 'Your promo code can no longer be applied.';
-      response = await fetch('https://pos-staging.loveanise.co.uk/api/website/offer-quote', { method:'POST', credentials:'omit', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...quoteRequest,promoCode:null}), signal:AbortSignal.timeout(12000) });
+      response = await fetch(window.AnisePos.api + '/api/website/offer-quote', { method:'POST', credentials:'omit', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...quoteRequest,promoCode:null}), signal:AbortSignal.timeout(12000) });
       quote = await response.json().catch(() => ({}));
       if (response.ok) data.promoCode = null;
     }
@@ -758,7 +758,7 @@ checkoutForm.addEventListener('submit', async event => {
   checkoutSubmit.disabled = true;
   checkoutStatus.textContent = 'Sending your order…';
   try {
-    const response = await fetch(isCard ? 'https://pos-staging.loveanise.co.uk/api/website/stripe-checkout' : 'https://pos-staging.loveanise.co.uk/api/website/orders/cash', {
+    const response = await fetch(isCard ? window.AnisePos.api + '/api/website/stripe-checkout' : window.AnisePos.api + '/api/website/orders/cash', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, credentials: 'omit',
       body: JSON.stringify({requestId: pending.requestId, ...data}), signal: AbortSignal.timeout(15000)
     });
@@ -770,11 +770,11 @@ checkoutForm.addEventListener('submit', async event => {
           checkingOffer = true;
           checkoutStatus.textContent = 'Checking the updated total…';
           let revisedRequest = {...quoteRequest};
-          let revisedResponse = await fetch('https://pos-staging.loveanise.co.uk/api/website/offer-quote', {method:'POST', credentials:'omit', headers:{'Content-Type':'application/json'}, body:JSON.stringify(revisedRequest), signal:AbortSignal.timeout(12000)});
+          let revisedResponse = await fetch(window.AnisePos.api + '/api/website/offer-quote', {method:'POST', credentials:'omit', headers:{'Content-Type':'application/json'}, body:JSON.stringify(revisedRequest), signal:AbortSignal.timeout(12000)});
           let revised = await revisedResponse.json().catch(() => ({}));
           if (!revisedResponse.ok && revised.code === 'promo_unavailable' && revisedRequest.promoCode) {
             revisedRequest.promoCode = null;
-            revisedResponse = await fetch('https://pos-staging.loveanise.co.uk/api/website/offer-quote', {method:'POST', credentials:'omit', headers:{'Content-Type':'application/json'}, body:JSON.stringify(revisedRequest), signal:AbortSignal.timeout(12000)});
+            revisedResponse = await fetch(window.AnisePos.api + '/api/website/offer-quote', {method:'POST', credentials:'omit', headers:{'Content-Type':'application/json'}, body:JSON.stringify(revisedRequest), signal:AbortSignal.timeout(12000)});
             revised = await revisedResponse.json().catch(() => ({}));
           }
           if (!revisedResponse.ok || !Number.isFinite(revised.total) || !Number.isFinite(revised.discount)) throw new Error('Unable to check the updated total.');

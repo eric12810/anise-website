@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const api = 'https://pos-staging.loveanise.co.uk';
+  const api = window.AnisePos.api;
   const isOrder = /^\/order(?:\.html)?\/?$/i.test(location.pathname);
   const anchor = document.querySelector(isOrder ? '.order-intro' : '.hero');
   if (!anchor || location.protocol !== 'https:') return;
