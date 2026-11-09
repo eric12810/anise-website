@@ -69,7 +69,7 @@ jobs:
               ftp.set_pasv(True)
               ftp.use_epsv = False
               ftp.sock.settimeout(120)
-              target = "/stagesiteftp/wwwroot"
+              target = "/testftp/wwwroot"
               phase = "accessing staging directory"
               ftp.cwd(target)
               if ftp.pwd().rstrip("/") != target:
