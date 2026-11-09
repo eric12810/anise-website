@@ -10,9 +10,10 @@ class ProductionGuardTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d); (root/'index.html').write_text('safe')
             (root/'release-manifest.json').write_text(json.dumps({'files': {'index.html': '0'*64}}))
-            with self.assertRaises(ValueError): production.verify_bundle(root)
+            (root/'staging-deployment-record.json').write_text('{}')
+            with self.assertRaises(ValueError): production.verify_bundle(root, '1', 'a'*40)
     def test_missing_approval_is_rejected(self):
         with mock.patch.object(production, 'EXPECTED_HOST', ''), mock.patch.object(production, 'EXPECTED_ROOT', ''):
-            with self.assertRaises(ValueError): production.check_settings('example', '/root')
+            with self.assertRaises(ValueError): production.check_settings('example', '/root', False)
 
 if __name__ == '__main__': unittest.main()
