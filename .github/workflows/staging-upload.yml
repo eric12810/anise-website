@@ -58,12 +58,16 @@ jobs:
           password = os.getenv("FTPS_PASSWORD", "")
           if host.lower() != "wsuk32.pronameserver.com" or user != "stagesiteftp" or not password:
               sys.exit("Missing or unexpected staging FTPS settings.")
+          phase = "connecting"
           try:
               ftp = ftplib.FTP_TLS(context=ssl.create_default_context(), timeout=30)
               ftp.connect(host, 21)
+              phase = "logging in"
               ftp.login(user, password)
+              phase = "securing data connection"
               ftp.prot_p()
               target = "/stagesiteftp/wwwroot"
+              phase = "accessing staging directory"
               ftp.cwd(target)
               if ftp.pwd().rstrip("/") != target:
                   sys.exit("Unexpected staging directory.")
@@ -76,12 +80,14 @@ jobs:
                       except ftplib.error_perm:
                           ftp.mkd(component)
                           ftp.cwd(component)
+                  phase = "uploading " + n
+                  print("Starting", n, flush=True)
                   with open(n, "rb") as source:
                       ftp.storbinary("STOR " + parts[-1], source)
-                  print("Uploaded", n)
+                  print("Uploaded", n, flush=True)
               ftp.quit()
           except (OSError, ftplib.Error) as exc:
-              print("Upload failed:", type(exc).__name__)
+              print("Upload failed during", phase, ":", type(exc).__name__, flush=True)
               sys.exit(1)
           print("Upload complete. Existing web.config and unlisted files were preserved.")
           PY
