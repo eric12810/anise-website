@@ -184,6 +184,11 @@ def deploy(names, hashes):
             ensure_remote_directory(ftp, name)
             print(f"Uploading [{number}/{len(changed)}] {name}", flush=True)
             curl_upload(ROOT / name, CURL_ROOT + "/" + name, password)
+            received = hashlib.sha256()
+            ftp.cwd(TARGET)
+            ftp.retrbinary("RETR " + name, received.update)
+            if received.hexdigest() != hashes[name]:
+                raise RuntimeError("Remote file hash verification failed; staging release is incomplete.")
             print("Uploaded:", name, flush=True)
         # No uploads to commit? The existing manifest already captures success.
         if changed or not previous:
