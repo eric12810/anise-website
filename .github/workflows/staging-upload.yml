@@ -88,14 +88,14 @@ jobs:
                   phase = "uploading " + n
                   credentials = user + ":" + password
                   escaped = credentials.replace("\\", "\\\\").replace('"', '\\\"').replace("\n", "\\n").replace("\r", "\\r")
-                  remote = target.rstrip("/") + "/" + "/".join(parts)
+                  remote = "/wwwroot/" + "/".join(parts)
                   with tempfile.NamedTemporaryFile() as config:
                       config.write(('user = "' + escaped + '"\\n').encode())
                       config.flush()
                       result = subprocess.run([
                           "curl", "--silent", "--show-error", "--fail", "--ssl-reqd", "--ftp-pasv", "--ftp-skip-pasv-ip",
                           "--connect-timeout", "30", "--max-time", "180", "--config", config.name,
-                          "--upload-file", n, "ftp://" + host + ":21/" + remote.lstrip("/")
+                          "--upload-file", n, "ftp://" + host + ":21" + remote
                       ], capture_output=True, text=True)
                   if result.returncode:
                       raise RuntimeError("curl upload failed with exit code " + str(result.returncode))
