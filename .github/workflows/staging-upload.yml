@@ -93,7 +93,7 @@ jobs:
                       config.write(('user = "' + escaped + '"\\n').encode())
                       config.flush()
                       result = subprocess.run([
-                          "curl", "--silent", "--show-error", "--fail", "--ssl-reqd",
+                          "curl", "--silent", "--show-error", "--fail", "--ssl-reqd", "--ftp-pasv", "--ftp-skip-pasv-ip",
                           "--connect-timeout", "30", "--max-time", "180", "--config", config.name,
                           "--upload-file", n, "ftp://" + host + ":21/" + remote.lstrip("/")
                       ], capture_output=True, text=True)
