@@ -27,7 +27,8 @@ jobs:
 
           # Provisional candidates: review against the hosted site before upload.
           root_files = """index.html menu.html order.html order-status.html
-          philosophy.html creations.html vegan.html stripe-cancelled.html
+          philosophy.html creations.html creations-hero-carousel.css
+          vegan.html stripe-cancelled.html
           styles.css menu-live.js order.css order.js order-status.js
           ordering-status.js plum-background.js promotion-cookie.js
           promotions-display.js stripe-resume.js robots.txt sitemap.xml""".split()
