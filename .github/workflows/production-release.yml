@@ -3,7 +3,10 @@ on:
   workflow_dispatch:
     inputs:
       staging_run_id: {description: 'Successful staging release Run ID', required: true, type: string}
-      mode: {description: Check only or deploy, required: true, type: choice, options: [check, deploy], default: check}
+      mode: {description: Check, bootstrap baseline, or deploy, required: true, type: choice, options: [check, bootstrap, deploy], default: check}
+      owner_confirmation: {description: 'Bootstrap only: type ESTABLISH PRODUCTION BASELINE', required: false, type: string}
+      backup_confirmation: {description: 'Bootstrap only: type BACKUP CONFIRMED', required: false, type: string}
+      backup_reference: {description: 'Bootstrap only: non-secret backup reference', required: false, type: string}
 permissions: {contents: read, actions: read}
 concurrency: {group: anise-website-production, cancel-in-progress: false}
 jobs:
@@ -32,6 +35,9 @@ jobs:
           STAGING_RUN_ID: ${{ inputs.staging_run_id }}
           COMMIT_SHA: ${{ steps.resolve.outputs.commit_sha }}
           MODE: ${{ inputs.mode }}
+          OWNER_CONFIRMATION: ${{ inputs.owner_confirmation }}
+          BACKUP_CONFIRMATION: ${{ inputs.backup_confirmation }}
+          BACKUP_REFERENCE: ${{ inputs.backup_reference }}
         run: |
           python3 scripts/website-production-deploy.py \
             --bundle artifacts/website-release \
@@ -39,7 +45,10 @@ jobs:
             --commit-sha "$COMMIT_SHA" \
             --host "$PROD_FTPS_EXPECTED_HOST" \
             --root "$PROD_FTPS_EXPECTED_ROOT" \
-            --mode "$MODE"
+            --mode "$MODE" \
+            --owner-confirmation "$OWNER_CONFIRMATION" \
+            --backup-confirmation "$BACKUP_CONFIRMATION" \
+            --backup-reference "$BACKUP_REFERENCE"
       - name: Verify live website health after deployment
         if: inputs.mode == 'deploy'
         run: curl --fail --silent --show-error --max-time 20 https://www.loveanise.co.uk/ > /dev/null

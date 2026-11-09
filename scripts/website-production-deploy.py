@@ -48,10 +48,10 @@ def check_settings(host, root, require_credentials):
         raise ValueError("Production FTPS password secret is missing")
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--bundle", required=True); ap.add_argument("--staging-run-id", required=True); ap.add_argument("--commit-sha", required=True); ap.add_argument("--host", required=True); ap.add_argument("--root", required=True); ap.add_argument("--mode", choices=("check", "deploy"), default="check")
-    a = ap.parse_args(); check_settings(a.host, a.root, True); files = verify_bundle(Path(a.bundle), a.staging_run_id, a.commit_sha)
+    ap = argparse.ArgumentParser(); ap.add_argument("--bundle", required=True); ap.add_argument("--staging-run-id", required=True); ap.add_argument("--commit-sha", required=True); ap.add_argument("--host", required=True); ap.add_argument("--root", required=True); ap.add_argument("--mode", choices=("check", "bootstrap", "deploy"), default="check"); ap.add_argument("--owner-confirmation", default=""); ap.add_argument("--backup-confirmation", default=""); ap.add_argument("--backup-reference", default="")
+    a = ap.parse_args(); check_settings(a.host, a.root, a.mode != "check"); files = verify_bundle(Path(a.bundle), a.staging_run_id, a.commit_sha)
     print('Offline artifact and destination validation passed')
-    transport.operate(a.host, os.environ['PROD_FTPS_USERNAME'], os.environ['PROD_FTPS_PASSWORD'], a.root, Path(a.bundle), files, a.mode)
+    transport.operate(a.host, os.environ['PROD_FTPS_USERNAME'], os.environ['PROD_FTPS_PASSWORD'], a.root, Path(a.bundle), files, a.mode, a.owner_confirmation, a.backup_confirmation, a.backup_reference)
 
 if __name__ == "__main__":
     try: main()
