@@ -95,7 +95,7 @@ def inventory(ftp, files):
         print('REVIEW REQUIRED: ' + issue)
     return changed, issues
 
-def bootstrap_baseline(ftp, root, owner_confirmation, backup_confirmation, backup_reference):
+def bootstrap_baseline(ftp, host, username, password, root, owner_confirmation, backup_confirmation, backup_reference):
     """Record an independently inspected live baseline; never uploads release files."""
     if owner_confirmation != 'ESTABLISH PRODUCTION BASELINE':
         raise RuntimeError('Owner baseline confirmation is required')
@@ -116,7 +116,7 @@ def bootstrap_baseline(ftp, root, owner_confirmation, backup_confirmation, backu
     payload = json.dumps({'version': 1, 'status': 'baseline', 'backup_reference': backup_reference.strip(), 'files': baseline}, sort_keys=True).encode()
     with tempfile.NamedTemporaryFile() as local:
         local.write(payload); local.flush()
-        curl_upload(os.environ['PROD_FTPS_HOST'], os.environ['PROD_FTPS_USERNAME'], os.environ['PROD_FTPS_PASSWORD'], root, MANIFEST, local.name)
+        curl_upload(host, username, password, root, MANIFEST, local.name)
     if remote_hash(ftp, MANIFEST) != hashlib.sha256(payload).hexdigest():
         raise RuntimeError('Baseline manifest verification failed')
     print(f'BASELINE ESTABLISHED: {len(baseline)} existing files recorded; no release files uploaded')
@@ -142,7 +142,7 @@ def operate(host, username, password, root, bundle, files, mode, owner_confirmat
         if mode == 'bootstrap':
             if MANIFEST in {PurePosixPath(n).name for n in ftp.nlst()} or PENDING in {PurePosixPath(n).name for n in ftp.nlst()}:
                 raise RuntimeError('A production manifest or pending marker already exists; bootstrap is only for first deployment')
-            bootstrap_baseline(ftp, root, owner_confirmation, backup_confirmation, backup_reference)
+            bootstrap_baseline(ftp, host, username, password, root, owner_confirmation, backup_confirmation, backup_reference)
             return
         changed, issues = inventory(ftp, files)
         if issues:
