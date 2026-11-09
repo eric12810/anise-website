@@ -16,33 +16,6 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - name: List candidate website files (offline only)
-        shell: bash
+      - name: List approved website files and hashes (offline only)
         run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import hashlib
-          import pathlib
-          import subprocess
-
-          # Provisional candidates: review against the hosted site before upload.
-          root_files = """index.html menu.html order.html order-status.html
-          philosophy.html creations.html creations-hero-carousel.css
-          vegan.html stripe-cancelled.html
-          styles.css menu-live.js order.css order.js order-status.js
-          ordering-status.js plum-background.js promotion-cookie.js
-          promotions-display.js stripe-resume.js robots.txt sitemap.xml""".split()
-          tracked = subprocess.check_output(
-              ["git", "ls-files", "-z"], text=True
-          ).split("\0")
-          files = sorted(set(root_files) | {
-              p for p in tracked if p.startswith("public/")
-          })
-          for name in files:
-              path = pathlib.Path(name)
-              if not path.is_file() or path.is_symlink() or name not in tracked:
-                  raise SystemExit(f"Missing, untracked or unsafe file: {name}")
-              digest = hashlib.sha256(path.read_bytes()).hexdigest()
-              print(f"{digest}  {name}")
-          print(f"\n{len(files)} candidate files. No server connection or upload was made.")
-          PY
+          python3 scripts/website-staging-deploy.py --preview
