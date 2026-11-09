@@ -56,7 +56,7 @@ jobs:
           host = os.getenv("FTPS_HOST", "")
           user = os.getenv("FTPS_USERNAME", "")
           password = os.getenv("FTPS_PASSWORD", "")
-          if host.lower() != "wsuk32.pronameserver.com" or user != "testftp" or not password:
+          if host.lower() != "wsuk32.pronameserver.com" or user != "stagesiteftp" or not password:
               sys.exit("Missing or unexpected staging FTPS settings.")
           phase = "connecting"
           try:
@@ -69,7 +69,7 @@ jobs:
               ftp.set_pasv(True)
               ftp.use_epsv = False
               ftp.sock.settimeout(120)
-              target = "/testftp/wwwroot"
+              target = "/stagesiteftp/wwwroot"
               phase = "accessing staging directory"
               ftp.cwd(target)
               if ftp.pwd().rstrip("/") != target:
