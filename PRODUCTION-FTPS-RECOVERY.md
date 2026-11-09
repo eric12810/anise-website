@@ -1,0 +1,13 @@
+# Production FTPS checks and recovery
+
+The uploader now uses certificate-verified curl uploads with credentials supplied over stdin, following the POS workaround for IIS TLS shutdown timeouts. Python retains the TLS control connection. Curl uses an absolute server path (double slash after the FTP authority), exactly matching the approved PWD; `/wwwroot` is never substituted for the account-qualified root.
+
+Check mode now connects to production read-only. Running it is explicit authorisation for that inspection. It lists the approved root and downloads hashes for the selected release and previous managed files. It never uploads, renames, creates directories or deletes files. Missing/unreadable files are reported without treating permission failures as proof of absence.
+
+The previous failed deployment has no trusted baseline. A missing, corrupt or pending production manifest, or mismatch against a recorded successful release, blocks all deployment writes. A check may therefore finish with a review-required failure, which is intentional. Review its per-file report and obtain a recoverable backup before establishing a baseline through an authorised hosting recovery session. Do not fabricate a successful manifest from the desired package. Establish it from independently verified existing application files; record version 1 and a files mapping of approved paths to actual SHA-256 hashes in `.anise-production-deployment.json`. Retain the recovery evidence and backup. Existing pending markers must be investigated and resolved by the authorised recovery operator; this workflow never removes them automatically.
+
+After baseline recovery, run check again, test the release manually, review the upload plan, then select deploy and obtain the production environment reviewer approval. Required reviewers must be configured in GitHub; naming an environment alone does not create review protection. The four LIVE_FTPS repository secrets remain unchanged.
+
+Each deploy rechecks the baseline, writes a pending marker before application changes, uploads only differing files, verifies SHA-256 and HTTP health, and publishes the successful manifest last. Failures leave evidence and stop retries. Old successful manifests are archived without deletion. Obsolete application files remain for review. Rollback uses an earlier approved artifact through the same workflow; it does not remove newer files automatically. Keep approved artifacts and hosting backups before artifact retention expires.
+
+No production connections or deployments were performed during implementation. The precise timeout location remains to be confirmed by the new stage logs.

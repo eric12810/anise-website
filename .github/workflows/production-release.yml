@@ -10,7 +10,7 @@ jobs:
   release:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     environment: production
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
         run: python3 scripts/resolve-staging-release.py
       - uses: actions/download-artifact@v4
         with: {github-token: '${{ secrets.GITHUB_TOKEN }}', run-id: '${{ inputs.staging_run_id }}', name: '${{ steps.resolve.outputs.artifact_name }}', path: artifacts/website-release}
-      - name: Verify selected release and production destination
+      - name: Validate release, inspect remote state and perform selected operation
         env:
           PROD_FTPS_EXPECTED_HOST: ${{ secrets.LIVE_FTPS_HOST }}
           PROD_FTPS_EXPECTED_ROOT: ${{ secrets.LIVE_FTPS_ROOT }}

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Guarded production deploy of an already-created website release bundle."""
 import argparse, ftplib, hashlib, json, os, ssl
+import production_transport as transport
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,7 +15,7 @@ def verify_bundle(bundle, staging_run_id=None, commit_sha=None):
         raise ValueError("Invalid release manifest")
     for name, digest in files.items():
         p = PurePosixPath(name)
-        if p.is_absolute() or ".." in p.parts or not isinstance(digest, str):
+        if not transport.safe_file(name) or not isinstance(digest, str):
             raise ValueError("Unsafe release manifest path")
         path = bundle / name
         if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != digest:
@@ -32,6 +33,10 @@ def check_settings(host, root, require_credentials):
     username = os.environ.get("PROD_FTPS_USERNAME", "")
     if not username:
         raise ValueError("Production FTPS username secret is missing")
+    if username != 'livesiteftp' or root != '/livesiteftp/wwwroot':
+        raise ValueError('Production account/root differs from owner-approved website destination')
+    if not __import__('re').fullmatch(r'[A-Za-z0-9.-]+', host):
+        raise ValueError('Invalid FTP hostname')
     staging_host = os.environ.get("STAGING_FTPS_HOST", "")
     staging_username = os.environ.get("STAGING_FTPS_USERNAME", "stagesiteftp")
     staging_root = os.environ.get("STAGING_FTPS_ROOT", "/stagesiteftp/wwwroot")
@@ -44,24 +49,10 @@ def check_settings(host, root, require_credentials):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--bundle", required=True); ap.add_argument("--staging-run-id", required=True); ap.add_argument("--commit-sha", required=True); ap.add_argument("--host", required=True); ap.add_argument("--root", required=True); ap.add_argument("--mode", choices=("check", "deploy"), default="check")
-    a = ap.parse_args(); check_settings(a.host, a.root, a.mode == "deploy"); files = verify_bundle(Path(a.bundle), a.staging_run_id, a.commit_sha)
-    if a.mode == "check": print(f"CHECK ONLY: verified {len(files)} files; no FTPS connection or write performed."); return
-    ftp = ftplib.FTP_TLS(context=ssl.create_default_context(), timeout=60)
-    try:
-        ftp.connect(a.host, 21); ftp.login(os.environ["PROD_FTPS_USERNAME"], os.environ["PROD_FTPS_PASSWORD"]); ftp.prot_p(); ftp.cwd(a.root)
-        for name in files:
-            local = Path(a.bundle) / name; parent = PurePosixPath(name).parent
-            ftp.cwd(a.root)
-            for part in parent.parts:
-                try: ftp.cwd(part)
-                except ftplib.error_perm:
-                    ftp.mkd(part); ftp.cwd(part)
-            with local.open("rb") as stream: ftp.storbinary("STOR " + PurePosixPath(name).name, stream)
-        print(f"DEPLOYED: {len(files)} verified release files; configuration/runtime files were not targeted.")
-    finally:
-        try: ftp.quit()
-        except Exception: ftp.close()
+    a = ap.parse_args(); check_settings(a.host, a.root, True); files = verify_bundle(Path(a.bundle), a.staging_run_id, a.commit_sha)
+    print('Offline artifact and destination validation passed')
+    transport.operate(a.host, os.environ['PROD_FTPS_USERNAME'], os.environ['PROD_FTPS_PASSWORD'], a.root, Path(a.bundle), files, a.mode)
 
 if __name__ == "__main__":
     try: main()
-    except Exception as e: print("PRODUCTION DEPLOYMENT FAILED:", type(e).__name__, str(e)); raise SystemExit(1)
+    except Exception as e: print('FAILED at ' + transport.STAGE + ' (' + type(e).__name__ + '). Review remote state before retry; no automatic recovery.'); raise SystemExit(1)

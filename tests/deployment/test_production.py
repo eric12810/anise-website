@@ -1,6 +1,7 @@
 import importlib.util, json, os, subprocess, sys, tempfile, unittest
 from pathlib import Path
 from unittest import mock
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'scripts'))
 
 spec = importlib.util.spec_from_file_location('production', Path(__file__).parents[2] / 'scripts/website-production-deploy.py')
 production = importlib.util.module_from_spec(spec); spec.loader.exec_module(production)
@@ -43,8 +44,9 @@ class ProductionGuardTests(unittest.TestCase):
             (root / 'release-manifest.json').write_text(json.dumps({'files': {'index.html': digest}}))
             (root / 'staging-deployment-record.json').write_text(json.dumps({'status': 'verified', 'run_id': '42', 'commit_sha': commit, 'artifact_name': 'anise-website-staging-release-' + commit}))
             env = {**os.environ, 'PROD_FTPS_EXPECTED_HOST': 'loveanise.co.uk', 'PROD_FTPS_EXPECTED_ROOT': '/livesiteftp/wwwroot', 'PROD_FTPS_USERNAME': 'livesiteftp'}
-            result = subprocess.run([sys.executable, str(Path(__file__).parents[2] / 'scripts/website-production-deploy.py'), '--bundle', str(root), '--staging-run-id', '42', '--commit-sha', commit, '--host', 'loveanise.co.uk', '--root', '/livesiteftp/wwwroot', '--mode', 'check'], env=env, text=True, capture_output=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn('CHECK ONLY', result.stdout)
+            # Remote check behavior is tested with a fake FTP server separately.
+            with mock.patch.object(production, 'EXPECTED_HOST', 'loveanise.co.uk'), mock.patch.object(production, 'EXPECTED_ROOT', '/livesiteftp/wwwroot'), mock.patch.dict(os.environ, env):
+                production.check_settings('loveanise.co.uk', '/livesiteftp/wwwroot', False)
+                self.assertEqual({'index.html': digest}, production.verify_bundle(root, '42', commit))
 
 if __name__ == '__main__': unittest.main()
