@@ -1,4 +1,4 @@
-// Refresh original photos when a new menu page is loaded.
+// Refresh original photos and thumbnails when a new menu page is loaded.
 const menuImageRevision = Date.now().toString();
 function menuPhotoUrl(path) {
   const url = new URL(path, "https://pos-staging.loveanise.co.uk/");
@@ -190,7 +190,7 @@ async function loadMenu() {
               photo.removeAttribute('srcset');
               photo.src = original;
             }, {once: true});
-            const thumbnail = 'dish-thumbnail.ashx?v=2&id=' + encodeURIComponent(product.id);
+            const thumbnail = 'dish-thumbnail.ashx?v=' + menuImageRevision + '&id=' + encodeURIComponent(product.id);
             photo.sizes = '(max-width: 600px) 30vw, (max-width: 800px) 25vw, 180px';
             photo.srcset = thumbnail + '&size=144 144w, ' + thumbnail + '&size=240 240w, ' + thumbnail + ' 480w';
             photo.src = thumbnail + '&size=240';

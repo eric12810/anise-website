@@ -1,0 +1,26 @@
+name: Website production release
+on:
+  workflow_dispatch:
+    inputs:
+      staging_run_id: {description: 'Exact successful staging workflow run ID', required: true, type: string}
+      artifact_name: {description: 'Exact artifact name from that staging run', required: true, type: string}
+      mode: {description: Check only or deploy, required: true, type: choice, options: [check, deploy], default: check}
+      host: {description: 'Approved production FTPS hostname', required: true, type: string}
+      remote_root: {description: 'Approved exact production FTPS root', required: true, type: string}
+      confirmation: {description: 'For deploy type DEPLOY production website', required: false, type: string}
+permissions: {contents: read, actions: read}
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.mode == 'deploy' && 'production' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: {github-token: '${{ secrets.GITHUB_TOKEN }}', run-id: '${{ inputs.staging_run_id }}', name: '${{ inputs.artifact_name }}', path: artifacts/website-release}
+      - name: Verify exact release and target (no live access in check mode)
+        env: {PROD_FTPS_EXPECTED_HOST: '${{ vars.PROD_FTPS_HOST || ''loveanise.co.uk'' }}', PROD_FTPS_EXPECTED_ROOT: '${{ vars.PROD_FTPS_ROOT || ''/livesiteftp/wwwroot'' }}', PROD_FTPS_USERNAME: '${{ secrets.LIVE_FTPS_USERNAME }}', PROD_FTPS_PASSWORD: '${{ secrets.LIVE_FTPS_PASSWORD }}'}
+        run: python3 scripts/website-production-deploy.py --bundle artifacts/website-release --host '${{ inputs.host }}' --root '${{ inputs.remote_root }}' --mode '${{ inputs.mode }}' --confirmation '${{ inputs.confirmation }}'
+      - name: Verify live website health after deployment
+        if: inputs.mode == 'deploy'
+        run: curl --fail --silent --show-error --max-time 20 https://www.loveanise.co.uk/ > /dev/null
