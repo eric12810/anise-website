@@ -44,6 +44,12 @@ class ProductionGuardTests(unittest.TestCase):
         self.assertNotIn('vars.PROD_FTPS_HOST', workflow)
         self.assertNotIn('vars.PROD_FTPS_ROOT', workflow)
 
+    def test_workflow_has_only_check_and_deploy_modes(self):
+        workflow = (Path(__file__).parents[2] / '.github/workflows/production-release.yml').read_text()
+        self.assertIn('options: [check, deploy]', workflow)
+        for obsolete in ('bootstrap', 'owner_confirmation', 'backup_confirmation', 'backup_reference'):
+            self.assertNotIn(obsolete, workflow)
+
     def test_pos_environment_mapping_is_explicit_and_complete(self):
         config = (Path(__file__).parents[2] / 'pos-environment.js').read_text()
         self.assertIn("'www.loveanise.co.uk': 'https://pos.loveanise.co.uk'", config)
