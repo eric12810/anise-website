@@ -60,12 +60,15 @@ jobs:
               sys.exit("Missing or unexpected staging FTPS settings.")
           phase = "connecting"
           try:
-              ftp = ftplib.FTP_TLS(context=ssl.create_default_context(), timeout=30)
+              ftp = ftplib.FTP_TLS(context=ssl.create_default_context(), timeout=120)
               ftp.connect(host, 21)
               phase = "logging in"
               ftp.login(user, password)
               phase = "securing data connection"
               ftp.prot_p()
+              ftp.set_pasv(True)
+              ftp.use_epsv = False
+              ftp.sock.settimeout(120)
               target = "/stagesiteftp/wwwroot"
               phase = "accessing staging directory"
               ftp.cwd(target)
@@ -83,7 +86,7 @@ jobs:
                   phase = "uploading " + n
                   print("Starting", n, flush=True)
                   with open(n, "rb") as source:
-                      ftp.storbinary("STOR " + parts[-1], source)
+                      ftp.storbinary("STOR " + parts[-1], source, blocksize=32768)
                   print("Uploaded", n, flush=True)
               ftp.quit()
           except (OSError, ftplib.Error) as exc:
