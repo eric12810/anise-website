@@ -23,7 +23,7 @@ public class DishThumbnail : IHttpHandler {
         int size = requested == "144" ? 144 : requested == "240" ? 240 : 480;
         byte[] thumbnail;
         try {
-            var request = (HttpWebRequest)WebRequest.Create("https://pos.loveanise.co.uk/api/menu/products/" + id + "/image");
+            var request = (HttpWebRequest)WebRequest.Create("https://pos-staging.loveanise.co.uk/api/menu/products/" + id + "/image");
             request.AllowAutoRedirect = false;
             request.Timeout = 10000;
             request.CachePolicy = new RequestCachePolicy(RequestCacheLevel.NoCacheNoStore);

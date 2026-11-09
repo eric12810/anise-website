@@ -50,7 +50,7 @@
     group.append(heading, items); return group;
   }
   try {
-    const response = await fetch('https://pos.loveanise.co.uk/api/menu', {cache:'no-store', credentials:'omit', signal:AbortSignal.timeout(12000)});
+    const response = await fetch('https://pos-staging.loveanise.co.uk/api/menu', {cache:'no-store', credentials:'omit', signal:AbortSignal.timeout(12000)});
     if (!response.ok) throw new Error('Menu unavailable');
     const categories = await response.json();
     if (!Array.isArray(categories) || !categories.every(c => Array.isArray(c.products) && c.products.every(p => Array.isArray(p.variants)))) throw new Error('Menu format unavailable');

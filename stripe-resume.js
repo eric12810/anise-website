@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const api = 'https://pos.loveanise.co.uk/api/website/';
+  const api = 'https://pos-staging.loveanise.co.uk/api/website/';
   const button = document.querySelector('#resume');
   const message = document.querySelector('#message');
   const statusLink = document.querySelector('#status-link');
