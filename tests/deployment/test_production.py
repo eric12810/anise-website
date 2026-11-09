@@ -44,11 +44,37 @@ class ProductionGuardTests(unittest.TestCase):
         self.assertNotIn('vars.PROD_FTPS_HOST', workflow)
         self.assertNotIn('vars.PROD_FTPS_ROOT', workflow)
 
+    def test_workflow_has_only_check_and_deploy_modes(self):
+        workflow = (Path(__file__).parents[2] / '.github/workflows/production-release.yml').read_text()
+        self.assertIn('options: [check, deploy]', workflow)
+        for obsolete in ('bootstrap', 'owner_confirmation', 'backup_confirmation', 'backup_reference'):
+            self.assertNotIn(obsolete, workflow)
+
     def test_pos_environment_mapping_is_explicit_and_complete(self):
         config = (Path(__file__).parents[2] / 'pos-environment.js').read_text()
         self.assertIn("'www.loveanise.co.uk': 'https://pos.loveanise.co.uk'", config)
         self.assertIn("'www.staging.loveanise.co.uk': 'https://pos-staging.loveanise.co.uk'", config)
         self.assertIn('Unsupported Anise website host', config)
+
+    def test_website_pages_load_environment_config_before_ordering_scripts(self):
+        root = Path(__file__).parents[2]
+        for page in ('index.html', 'menu.html', 'order.html', 'order-status.html', 'stripe-cancelled.html'):
+            content = (root / page).read_text()
+            self.assertIn('pos-environment.js', content)
+        for name in ('order.js', 'menu-live.js', 'order-status.js', 'ordering-status.js', 'promotions-display.js', 'stripe-resume.js'):
+            content = (root / name).read_text()
+            self.assertNotIn("'https://pos-staging.loveanise.co.uk", content)
+            self.assertIn('AnisePos.api', content)
+
+    def test_staging_package_allowlist_includes_environment_config(self):
+        deploy = (Path(__file__).parents[2] / 'scripts/website-staging-deploy.py').read_text()
+        self.assertIn('pos-environment.js', deploy)
+
+    def test_thumbnail_handler_has_fail_closed_environment_mapping(self):
+        content = (Path(__file__).parents[2] / 'dish-thumbnail.ashx').read_text()
+        self.assertIn('pos.loveanise.co.uk', content)
+        self.assertIn('pos-staging.loveanise.co.uk', content)
+        self.assertIn('StatusCode = 400', content)
 
     def test_check_mode_verifies_without_connecting(self):
         commit = 'a' * 40

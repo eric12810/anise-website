@@ -23,11 +23,11 @@ public class DishThumbnail : IHttpHandler {
         int size = requested == "144" ? 144 : requested == "240" ? 240 : 480;
         byte[] thumbnail;
         try {
-            string websiteHost = context.Request.Url.DnsSafeHost.ToLowerInvariant();
+            string host = context.Request.Url.DnsSafeHost.ToLowerInvariant();
             string posHost;
-            if (websiteHost == "www.loveanise.co.uk" || websiteHost == "loveanise.co.uk")
+            if (host == "www.loveanise.co.uk" || host == "loveanise.co.uk")
                 posHost = "pos.loveanise.co.uk";
-            else if (websiteHost == "www.staging.loveanise.co.uk" || websiteHost == "staging.loveanise.co.uk")
+            else if (host == "www.staging.loveanise.co.uk" || host == "staging.loveanise.co.uk")
                 posHost = "pos-staging.loveanise.co.uk";
             else {
                 context.Response.StatusCode = 400;

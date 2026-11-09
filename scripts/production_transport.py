@@ -61,7 +61,7 @@ def inventory(ftp, files):
     if PENDING in names:
         issues.append('Incomplete deployment marker present')
     if MANIFEST not in names:
-        issues.append('No trusted production manifest: existing installation requires review and baseline recovery')
+        issues.append('No trusted production manifest: existing installation requires review and manual recovery')
     else:
         try:
             payload = json.loads(read_bytes(ftp, MANIFEST))
@@ -95,32 +95,6 @@ def inventory(ftp, files):
         print('REVIEW REQUIRED: ' + issue)
     return changed, issues
 
-def bootstrap_baseline(ftp, host, username, password, root, owner_confirmation, backup_confirmation, backup_reference):
-    """Record an independently inspected live baseline; never uploads release files."""
-    if owner_confirmation != 'ESTABLISH PRODUCTION BASELINE':
-        raise RuntimeError('Owner baseline confirmation is required')
-    if backup_confirmation != 'BACKUP CONFIRMED' or not backup_reference.strip():
-        raise RuntimeError('Verified backup confirmation and reference are required')
-    names = sorted({PurePosixPath(n).name for n in ftp.nlst() if safe_file(PurePosixPath(n).name)})
-    baseline = {}
-    for name in names:
-        stage('bootstrap hash: ' + name)
-        try:
-            baseline[name] = remote_hash(ftp, name)
-        except ftplib.error_perm as error:
-            if not str(error).startswith('550'):
-                raise
-            print('Skipped unreadable live file: ' + name)
-    if not baseline:
-        raise RuntimeError('No readable live files found; baseline not established')
-    payload = json.dumps({'version': 1, 'status': 'baseline', 'backup_reference': backup_reference.strip(), 'files': baseline}, sort_keys=True).encode()
-    with tempfile.NamedTemporaryFile() as local:
-        local.write(payload); local.flush()
-        curl_upload(host, username, password, root, MANIFEST, local.name)
-    if remote_hash(ftp, MANIFEST) != hashlib.sha256(payload).hexdigest():
-        raise RuntimeError('Baseline manifest verification failed')
-    print(f'BASELINE ESTABLISHED: {len(baseline)} existing files recorded; no release files uploaded')
-
 def health():
     stage('verify production HTTP health')
     for path in ('/', '/menu', '/order'):
@@ -128,7 +102,9 @@ def health():
             if response.status != 200 or not response.read(1024) or not response.url.startswith('https://www.loveanise.co.uk/'):
                 raise RuntimeError('Website health verification failed')
 
-def operate(host, username, password, root, bundle, files, mode, owner_confirmation='', backup_confirmation='', backup_reference=''):
+def operate(host, username, password, root, bundle, files, mode):
+    if mode not in {'check', 'deploy'}:
+        raise ValueError('Unsupported production operation; choose check or deploy')
     ftp = ftplib.FTP_TLS(context=ssl.create_default_context(), timeout=60)
     try:
         stage('connect to production FTPS'); ftp.connect(host, 21)
@@ -139,11 +115,6 @@ def operate(host, username, password, root, bundle, files, mode, owner_confirmat
         stage('verify remote directory')
         if ftp.pwd() != root:
             raise RuntimeError('Server root differs from approved root')
-        if mode == 'bootstrap':
-            if MANIFEST in {PurePosixPath(n).name for n in ftp.nlst()} or PENDING in {PurePosixPath(n).name for n in ftp.nlst()}:
-                raise RuntimeError('A production manifest or pending marker already exists; bootstrap is only for first deployment')
-            bootstrap_baseline(ftp, host, username, password, root, owner_confirmation, backup_confirmation, backup_reference)
-            return
         changed, issues = inventory(ftp, files)
         if issues:
             raise RuntimeError('Remote state needs review; no writes permitted')
