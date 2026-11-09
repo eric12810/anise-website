@@ -2,25 +2,53 @@ name: Website production release
 on:
   workflow_dispatch:
     inputs:
-      staging_run_id: {description: 'Exact successful staging workflow run ID', required: true, type: string}
-      artifact_name: {description: 'Exact artifact name from that staging run', required: true, type: string}
-      mode: {description: Check only or deploy, required: true, type: choice, options: [check, deploy], default: check}
-      host: {description: 'Approved production FTPS hostname', required: true, type: string}
-      remote_root: {description: 'Approved exact production FTPS root', required: true, type: string}
-      confirmation: {description: 'For deploy type DEPLOY production website', required: false, type: string}
+      staging_run_id: {description: 'Successful staging release Run ID', required: true, type: string}
+      mode: {description: Check, bootstrap baseline, or deploy, required: true, type: choice, options: [check, bootstrap, deploy], default: check}
+      owner_confirmation: {description: 'Bootstrap only: type ESTABLISH PRODUCTION BASELINE', required: false, type: string}
+      backup_confirmation: {description: 'Bootstrap only: type BACKUP CONFIRMED', required: false, type: string}
+      backup_reference: {description: 'Bootstrap only: non-secret backup reference', required: false, type: string}
 permissions: {contents: read, actions: read}
+concurrency: {group: anise-website-production, cancel-in-progress: false}
 jobs:
   release:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    environment: ${{ inputs.mode == 'deploy' && 'production' || '' }}
+    timeout-minutes: 60
+    environment: production
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve approved staging release
+        id: resolve
+        env: {GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}', STAGING_RUN_ID: '${{ inputs.staging_run_id }}'}
+        run: python3 scripts/resolve-staging-release.py
       - uses: actions/download-artifact@v4
-        with: {github-token: '${{ secrets.GITHUB_TOKEN }}', run-id: '${{ inputs.staging_run_id }}', name: '${{ inputs.artifact_name }}', path: artifacts/website-release}
-      - name: Verify exact release and target (no live access in check mode)
-        env: {PROD_FTPS_EXPECTED_HOST: '${{ vars.PROD_FTPS_HOST || ''loveanise.co.uk'' }}', PROD_FTPS_EXPECTED_ROOT: '${{ vars.PROD_FTPS_ROOT || ''/livesiteftp/wwwroot'' }}', PROD_FTPS_USERNAME: '${{ secrets.LIVE_FTPS_USERNAME }}', PROD_FTPS_PASSWORD: '${{ secrets.LIVE_FTPS_PASSWORD }}'}
-        run: python3 scripts/website-production-deploy.py --bundle artifacts/website-release --host '${{ inputs.host }}' --root '${{ inputs.remote_root }}' --mode '${{ inputs.mode }}' --confirmation '${{ inputs.confirmation }}'
+        with: {github-token: '${{ secrets.GITHUB_TOKEN }}', run-id: '${{ inputs.staging_run_id }}', name: '${{ steps.resolve.outputs.artifact_name }}', path: artifacts/website-release}
+      - name: Validate release, inspect remote state and perform selected operation
+        env:
+          PROD_FTPS_EXPECTED_HOST: ${{ secrets.LIVE_FTPS_HOST }}
+          PROD_FTPS_EXPECTED_ROOT: ${{ secrets.LIVE_FTPS_ROOT }}
+          PROD_FTPS_USERNAME: ${{ secrets.LIVE_FTPS_USERNAME }}
+          PROD_FTPS_PASSWORD: ${{ secrets.LIVE_FTPS_PASSWORD }}
+          STAGING_FTPS_HOST: ${{ secrets.STAGING_FTPS_HOST }}
+          STAGING_FTPS_USERNAME: stagesiteftp
+          STAGING_FTPS_ROOT: /stagesiteftp/wwwroot
+          STAGING_RUN_ID: ${{ inputs.staging_run_id }}
+          COMMIT_SHA: ${{ steps.resolve.outputs.commit_sha }}
+          MODE: ${{ inputs.mode }}
+          OWNER_CONFIRMATION: ${{ inputs.owner_confirmation }}
+          BACKUP_CONFIRMATION: ${{ inputs.backup_confirmation }}
+          BACKUP_REFERENCE: ${{ inputs.backup_reference }}
+        run: |
+          python3 scripts/website-production-deploy.py \
+            --bundle artifacts/website-release \
+            --staging-run-id "$STAGING_RUN_ID" \
+            --commit-sha "$COMMIT_SHA" \
+            --host "$PROD_FTPS_EXPECTED_HOST" \
+            --root "$PROD_FTPS_EXPECTED_ROOT" \
+            --mode "$MODE" \
+            --owner-confirmation "$OWNER_CONFIRMATION" \
+            --backup-confirmation "$BACKUP_CONFIRMATION" \
+            --backup-reference "$BACKUP_REFERENCE"
       - name: Verify live website health after deployment
         if: inputs.mode == 'deploy'
         run: curl --fail --silent --show-error --max-time 20 https://www.loveanise.co.uk/ > /dev/null

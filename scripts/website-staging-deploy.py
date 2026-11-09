@@ -27,7 +27,7 @@ MANIFEST_VERSION = 1
 ROOT_FILES = """index.html menu.html order.html order-status.html philosophy.html
 creations.html vegan.html stripe-cancelled.html styles.css creations-hero-carousel.css
 menu-live.js order.css order.js order-status.js ordering-status.js plum-background.js
-promotion-cookie.js promotions-display.js stripe-resume.js dish-thumbnail.ashx""".split()
+promotion-cookie.js promotions-display.js stripe-resume.js pos-environment.js dish-thumbnail.ashx""".split()
 PUBLIC_EXTENSIONS = {".svg", ".png", ".webp", ".jpg", ".jpeg", ".mp4",
                      ".eot", ".ttf", ".woff", ".woff2"}
 PATH_PATTERN = re.compile(r"[A-Za-z0-9_./-]+\Z")
@@ -184,6 +184,11 @@ def deploy(names, hashes):
             ensure_remote_directory(ftp, name)
             print(f"Uploading [{number}/{len(changed)}] {name}", flush=True)
             curl_upload(ROOT / name, CURL_ROOT + "/" + name, password)
+            received = hashlib.sha256()
+            ftp.cwd(TARGET)
+            ftp.retrbinary("RETR " + name, received.update)
+            if received.hexdigest() != hashes[name]:
+                raise RuntimeError("Remote file hash verification failed; staging release is incomplete.")
             print("Uploaded:", name, flush=True)
         # No uploads to commit? The existing manifest already captures success.
         if changed or not previous:

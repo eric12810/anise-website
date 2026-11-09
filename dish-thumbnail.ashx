@@ -23,7 +23,17 @@ public class DishThumbnail : IHttpHandler {
         int size = requested == "144" ? 144 : requested == "240" ? 240 : 480;
         byte[] thumbnail;
         try {
-            var request = (HttpWebRequest)WebRequest.Create("https://pos-staging.loveanise.co.uk/api/menu/products/" + id + "/image");
+            string host = context.Request.Url.DnsSafeHost.ToLowerInvariant();
+            string posHost;
+            if (host == "www.loveanise.co.uk" || host == "loveanise.co.uk")
+                posHost = "pos.loveanise.co.uk";
+            else if (host == "www.staging.loveanise.co.uk" || host == "staging.loveanise.co.uk")
+                posHost = "pos-staging.loveanise.co.uk";
+            else {
+                context.Response.StatusCode = 400;
+                return;
+            }
+            var request = (HttpWebRequest)WebRequest.Create("https://" + posHost + "/api/menu/products/" + id + "/image");
             request.AllowAutoRedirect = false;
             request.Timeout = 10000;
             request.CachePolicy = new RequestCachePolicy(RequestCacheLevel.NoCacheNoStore);
