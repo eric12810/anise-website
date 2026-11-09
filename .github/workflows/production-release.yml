@@ -3,10 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       staging_run_id: {description: 'Successful staging release Run ID', required: true, type: string}
-      mode: {description: Check, bootstrap baseline, or deploy, required: true, type: choice, options: [check, bootstrap, deploy], default: check}
-      owner_confirmation: {description: 'Bootstrap only: type ESTABLISH PRODUCTION BASELINE', required: false, type: string}
-      backup_confirmation: {description: 'Bootstrap only: type BACKUP CONFIRMED', required: false, type: string}
-      backup_reference: {description: 'Bootstrap only: non-secret backup reference', required: false, type: string}
+      mode: {description: Check or deploy, required: true, type: choice, options: [check, deploy], default: check}
 permissions: {contents: read, actions: read}
 concurrency: {group: anise-website-production, cancel-in-progress: false}
 jobs:
