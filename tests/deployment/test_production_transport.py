@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -99,9 +100,19 @@ class Tests(unittest.TestCase):
         self.assertNotIn('missing.html', baseline['files']); self.assertNotIn('index.html', self.ftp.writes[0:1])
     def test_bootstrap_requires_owner_and_backup_confirmation(self):
         with patch.object(t, 'curl_upload'):
-            with self.assertRaises(RuntimeError): t.bootstrap_baseline(self.ftp, '/livesiteftp/wwwroot', '', 'BACKUP CONFIRMED', 'ref')
-            with self.assertRaises(RuntimeError): t.bootstrap_baseline(self.ftp, '/livesiteftp/wwwroot', 'ESTABLISH PRODUCTION BASELINE', '', 'ref')
+            with self.assertRaises(RuntimeError): t.bootstrap_baseline(self.ftp, 'host', 'livesiteftp', 'secret', '/livesiteftp/wwwroot', '', 'BACKUP CONFIRMED', 'ref')
+            with self.assertRaises(RuntimeError): t.bootstrap_baseline(self.ftp, 'host', 'livesiteftp', 'secret', '/livesiteftp/wwwroot', 'ESTABLISH PRODUCTION BASELINE', '', 'ref')
             t.curl_upload.assert_not_called()
+    def test_bootstrap_uses_validated_operate_credentials_without_environment(self):
+        self.ftp = FTP(); del self.ftp.files[t.MANIFEST]
+        with patch.object(t.ftplib, 'FTP_TLS', return_value=self.ftp), patch.object(t, 'curl_upload', side_effect=self.upload) as upload, patch.dict('os.environ', {}, clear=False):
+            os.environ.pop('PROD_FTPS_HOST', None)
+            os.environ.pop('PROD_FTPS_USERNAME', None)
+            os.environ.pop('PROD_FTPS_PASSWORD', None)
+            t.operate('validated.example', 'livesiteftp', 'passed-secret', '/livesiteftp/wwwroot', self.bundle, self.files, 'bootstrap', 'ESTABLISH PRODUCTION BASELINE', 'BACKUP CONFIRMED', 'backup-ref')
+        self.assertEqual('validated.example', upload.call_args.args[0])
+        self.assertEqual('livesiteftp', upload.call_args.args[1])
+        self.assertEqual('passed-secret', upload.call_args.args[2])
     def test_interrupted_bootstrap_does_not_claim_success(self):
         self.ftp = FTP(); del self.ftp.files[t.MANIFEST]
         with patch.object(t.ftplib, 'FTP_TLS', return_value=self.ftp), patch.object(t, 'curl_upload', side_effect=TimeoutError()), patch.dict('os.environ', {'PROD_FTPS_HOST':'host', 'PROD_FTPS_USERNAME':'livesiteftp', 'PROD_FTPS_PASSWORD':'secret'}):
