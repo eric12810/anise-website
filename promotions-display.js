@@ -9,7 +9,7 @@
   const title = document.createElement('h2'); title.id = 'promotion-display-title'; title.textContent = 'A little something from Anise';
   const note = document.createElement('p'); note.textContent = 'Discover offers for your next order.'; heading.append(title,note);
   const offers = document.createElement('div'); offers.className = 'promotion-display-list';
-  if (isOrder) section.hidden = true;
+  section.hidden = true;
   section.append(heading,offers); anchor.after(section);
   async function refresh() {
     try {
