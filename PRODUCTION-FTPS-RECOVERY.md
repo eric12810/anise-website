@@ -1,5 +1,7 @@
 # Production FTPS checks and recovery
 
+> **Historical recovery notes.** The current `.github/workflows/production-release.yml` and `scripts/website-production-deploy.py` support `check` and `deploy` modes only. The `bootstrap` instructions below describe an earlier workflow and must not be used as current operating steps. Confirm the active workflow and remote state before any recovery action.
+
 The uploader now uses certificate-verified curl uploads with credentials supplied over stdin, following the POS workaround for IIS TLS shutdown timeouts. Python retains the TLS control connection. Curl uses an absolute server path (double slash after the FTP authority), exactly matching the approved PWD; `/wwwroot` is never substituted for the account-qualified root.
 
 Check mode now connects to production read-only. Running it is explicit authorisation for that inspection. It lists the approved root and downloads hashes for the selected release and previous managed files. It never uploads, renames, creates directories or deletes files. Missing/unreadable files are reported without treating permission failures as proof of absence.
