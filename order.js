@@ -322,7 +322,7 @@ refreshItemDiscounts();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshItemDiscounts(); });
 setInterval(() => { if (!document.hidden) refreshItemDiscounts(); }, 60000);
 
-// Card checkout is enabled only when the server reports a configured test integration.
+// Card checkout is enabled only when the POS reports a configured Stripe integration.
 let appliedPromo = null;
 const promoInput = document.querySelector('#promo-code');
 const promoResult = document.querySelector('#promo-result');
@@ -645,7 +645,7 @@ function updateCheckoutPayment() {
   document.querySelector('#checkout-review-payment').textContent = cash ? 'Cash' : 'Card';
   checkoutSubmit.disabled = checkingOffer || (!cash && !cardAvailable);
   checkoutSubmit.textContent = cash ? 'Place cash order' : 'Continue to card payment';
-  checkoutStatus.textContent = cash ? 'Your order will be sent to the restaurant for confirmation. Cash payment is due on collection or delivery.' : cardAvailable ? 'You will continue to Stripe’s secure test checkout. Your order will be sent to the restaurant after payment is confirmed.' : 'Card payment is not available yet.';
+  checkoutStatus.textContent = cash ? 'Your order will be sent to the restaurant for confirmation. Cash payment is due on collection or delivery.' : cardAvailable ? 'You will continue to Stripe’s secure checkout. Your order will be sent to the restaurant after payment is confirmed.' : 'Card payment is not available yet.';
 }
 checkoutForm.addEventListener('change', event => {
   if (event.target.name === 'payment') { clearCheckoutError(); updateCheckoutPayment(); }
