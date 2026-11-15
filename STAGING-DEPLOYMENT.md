@@ -1,5 +1,7 @@
 # Anise staging deployment
 
+> **Historical deployment record (October–November 2026).** The `anise.dotnetcloud.co.uk` URLs, `/188230/` path and statement that there is no separate staging POS describe the former hosting setup. Do not use them for current deployments. The active staging website is `https://www.staging.loveanise.co.uk`, with POS staging at `https://pos-staging.loveanise.co.uk`. Check the current GitHub Actions workflows and `AGENTS.md` before deployment.
+
 - Order-confirmation sender: `anise@loveanise.co.uk` (Gmail/Google Workspace). Cash-order receipt and acceptance emails were deployed and verified in the checkout workflow chat. Do not store passwords or access tokens in this file.
 
 - Website staging URL: https://staging.anise.dotnetcloud.co.uk/ (HTTPS verified 30 October 2026).
