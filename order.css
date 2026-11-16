@@ -113,18 +113,21 @@ main:not(.order-plum-ready)::before{content:none}
 }
 @media(min-width:801px){.category-nav{max-height:calc(100dvh - 136px)}}
 
-/* Let dish details size to their content while keeping purchase controls in view. */
+/* Keep the image and purchase controls in place while dish options scroll. */
 .dish-dialog{
+  width:min(560px,calc(100% - 32px));
+  height:min(760px,95vh);
+  height:min(760px,95dvh);
   max-height:95vh;
   max-height:95dvh;
-  min-height:min(480px,95vh);
-  min-height:min(480px,95dvh);
+  min-height:0;
   overflow:hidden;
 }
 .dish-dialog[open]{display:flex;flex-direction:column}
-.dish-dialog .dialog-content{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;padding:0;overflow:hidden}
+.dish-dialog .dialog-content{display:flex;flex:1 1 auto;flex-direction:column;height:100%;min-height:0;padding:0;overflow:hidden}
 .dialog-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-.dish-dialog .dialog-image{height:clamp(140px,24dvh,220px);aspect-ratio:auto}
+.dish-dialog .dialog-image{flex:0 0 28%;height:auto;min-height:0;aspect-ratio:auto}
+.dish-dialog .dialog-image img{inset:0;width:100%;height:100%;object-fit:contain}
 .dialog-details{padding:30px 36px 32px}
 .dialog-footer{flex:none;padding:16px 36px 24px;border-top:1px solid #e3dbcf;background:#fff}
 .dialog-purchase{display:flex;align-items:end;justify-content:space-between;gap:20px}
@@ -133,7 +136,7 @@ main:not(.order-plum-ready)::before{content:none}
 .dialog-purchase .dialog-price{margin:0;text-align:right;font-size:18px;font-weight:600}
 .dialog-footer .dialog-add{margin-top:14px}
 @media(max-width:600px){
-  .dish-dialog .dialog-image{height:clamp(110px,22dvh,160px)}
+  .dish-dialog .dialog-image{flex-basis:24%}
   .dialog-details{padding:24px}
   .dialog-footer{padding:12px 24px 16px}
 }
