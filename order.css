@@ -112,3 +112,28 @@ main:not(.order-plum-ready)::before{content:none}
   #category-links a[aria-current="location"]{box-shadow:inset 0 -3px #647d4c}
 }
 @media(min-width:801px){.category-nav{max-height:calc(100dvh - 136px)}}
+
+/* Let dish details size to their content while keeping purchase controls in view. */
+.dish-dialog{
+  max-height:95vh;
+  max-height:95dvh;
+  min-height:min(480px,95vh);
+  min-height:min(480px,95dvh);
+  overflow:hidden;
+}
+.dish-dialog[open]{display:flex;flex-direction:column}
+.dish-dialog .dialog-content{display:flex;flex:1 1 auto;flex-direction:column;min-height:0;padding:0;overflow:hidden}
+.dialog-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.dish-dialog .dialog-image{height:clamp(140px,24dvh,220px);aspect-ratio:auto}
+.dialog-details{padding:30px 36px 32px}
+.dialog-footer{flex:none;padding:16px 36px 24px;border-top:1px solid #e3dbcf;background:#fff}
+.dialog-purchase{display:flex;align-items:end;justify-content:space-between;gap:20px}
+.dialog-purchase label,.dialog-total-label{display:block;margin-bottom:6px;font-size:14px;font-weight:600}
+.dialog-purchase input{width:90px;border:1px solid #d0c4b4;background:#fff;color:#302522;padding:10px 11px;font:16px var(--sans)}
+.dialog-purchase .dialog-price{margin:0;text-align:right;font-size:18px;font-weight:600}
+.dialog-footer .dialog-add{margin-top:14px}
+@media(max-width:600px){
+  .dish-dialog .dialog-image{height:clamp(110px,22dvh,160px)}
+  .dialog-details{padding:24px}
+  .dialog-footer{padding:12px 24px 16px}
+}

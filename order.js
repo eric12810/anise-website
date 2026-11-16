@@ -26,12 +26,12 @@ function salePrice(price, discount) {
 function priceLabel(price, discount, prefix = '') {
   return discount && salePrice(price, discount) < price ? `${prefix}originally ${money(price)}, offer price ${money(salePrice(price, discount))}${discount.minimumSubtotal ? ` with a minimum food order of ${money(discount.minimumSubtotal)}` : ''}` : prefix + money(price);
 }
-function renderDishPrice(target, price, discount, prefix = '') {
+function renderDishPrice(target, price, discount, prefix = '', quantity = 1) {
   target.replaceChildren();
   if (prefix) target.append(document.createTextNode(prefix));
-  if (!discount || salePrice(price, discount) >= price) { target.append(document.createTextNode(money(price))); return; }
-  const old = element('s', money(price), 'dish-price-old'); old.setAttribute('aria-label', 'Original price ' + money(price));
-  const current = element('strong', money(salePrice(price, discount)), 'dish-price-sale'); current.setAttribute('aria-label', 'Offer price ' + money(salePrice(price, discount)));
+  if (!discount || salePrice(price, discount) >= price) { target.append(document.createTextNode(money(price * quantity))); return; }
+  const old = element('s', money(price * quantity), 'dish-price-old'); old.setAttribute('aria-label', 'Original price ' + money(price * quantity));
+  const current = element('strong', money(salePrice(price, discount) * quantity), 'dish-price-sale'); current.setAttribute('aria-label', 'Offer price ' + money(salePrice(price, discount) * quantity));
   target.append(old, document.createTextNode(' '), current);
   if (discount.minimumSubtotal) target.append(element('small', `Minimum food order ${money(discount.minimumSubtotal)}`, 'dish-price-condition'));
 }
@@ -127,7 +127,7 @@ function openDish(product, category) {
     (product.modifierGroups || []).forEach((group, index) => {
       options.querySelectorAll(`input[name="modifier-${index}"]:checked`).forEach(input => { price += group.modifiers[Number(input.value)].priceAdjustment; });
     });
-    renderDishPrice(document.querySelector('.dialog-price'), price, itemDiscounts.get(product.id));
+    renderDishPrice(document.querySelector('.dialog-price'), price, itemDiscounts.get(product.id), '', Number(quantityInput.value) || 1);
   };
   refreshOpenDishPrice = () => {
     options.querySelectorAll('input[name="dish-variant"]').forEach(input => {
@@ -136,8 +136,11 @@ function openDish(product, category) {
     });
     updatePrice();
   };
-  options.onchange = updatePrice; updatePrice();
+  options.onchange = updatePrice;
+  quantityInput.oninput = updatePrice;
+  updatePrice();
   dialog.showModal();
+  dialog.querySelector('.dialog-scroll').scrollTop = 0;
 }
 async function loadMenu() {
   const status = document.querySelector('#menu-status');
