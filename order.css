@@ -122,10 +122,11 @@ main:not(.order-plum-ready)::before{content:none}
   max-height:95dvh;
   min-height:0;
   overflow:hidden;
+  overscroll-behavior:none;
 }
 .dish-dialog[open]{display:flex;flex-direction:column}
 .dish-dialog .dialog-content{display:flex;flex:1 1 auto;flex-direction:column;height:100%;min-height:0;padding:0;overflow:hidden}
-.dialog-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.dialog-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:none;-webkit-overflow-scrolling:touch}
 .dish-dialog .dialog-image{flex:0 0 28%;height:auto;min-height:0;aspect-ratio:auto}
 .dish-dialog .dialog-image img{inset:0;width:100%;height:100%;object-fit:contain}
 .dialog-details{padding:30px 36px 32px}

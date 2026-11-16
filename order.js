@@ -17,6 +17,61 @@ const options = document.querySelector('#dish-options');
 const selected = new Map();
 const money = value => new Intl.NumberFormat('en-GB', {style: 'currency', currency: 'GBP'}).format(value);
 let currentDish;
+let dishScrollLock = null;
+let dishRemovalObserver = null;
+const dishLockedBodyStyles = ['position', 'top', 'left', 'width', 'overflow'];
+const dishLockedRootStyles = ['overflow-y', 'overscroll-behavior', 'scroll-behavior'];
+function saveInlineStyles(element, properties) {
+  return properties.map(property => [property, element.style.getPropertyValue(property), element.style.getPropertyPriority(property)]);
+}
+function restoreInlineStyles(element, styles) {
+  styles.forEach(([property, value, priority]) => {
+    if (value) element.style.setProperty(property, value, priority);
+    else element.style.removeProperty(property);
+  });
+}
+function updateDishLockedWidth() {
+  if (dishScrollLock) document.body.style.width = `${document.documentElement.clientWidth}px`;
+}
+function lockDishPageScroll() {
+  if (dishScrollLock) return;
+  const root = document.documentElement;
+  const body = document.body;
+  dishScrollLock = {
+    x: window.scrollX, y: window.scrollY,
+    bodyStyles: saveInlineStyles(body, dishLockedBodyStyles),
+    rootStyles: saveInlineStyles(root, dishLockedRootStyles)
+  };
+  const hasScrollbarGutter = window.innerWidth > root.clientWidth;
+  // Keep the desktop scrollbar space while the fixed body leaves normal flow.
+  root.style.overflowY = hasScrollbarGutter ? 'scroll' : 'hidden';
+  root.style.overscrollBehavior = 'none';
+  body.style.position = 'fixed';
+  body.style.top = `-${dishScrollLock.y}px`;
+  body.style.left = `-${dishScrollLock.x}px`;
+  body.style.overflow = 'hidden';
+  updateDishLockedWidth();
+  window.addEventListener('resize', updateDishLockedWidth);
+  dishRemovalObserver = new MutationObserver(() => { if (!dialog.isConnected) unlockDishPageScroll(); });
+  dishRemovalObserver.observe(body, {childList: true});
+}
+function unlockDishPageScroll() {
+  if (!dishScrollLock) return;
+  const {x, y, bodyStyles, rootStyles} = dishScrollLock;
+  dishScrollLock = null;
+  dishRemovalObserver?.disconnect();
+  dishRemovalObserver = null;
+  window.removeEventListener('resize', updateDishLockedWidth);
+  restoreInlineStyles(document.body, bodyStyles);
+  restoreInlineStyles(document.documentElement, rootStyles);
+  // The site's smooth scrolling must not animate the saved position back.
+  document.documentElement.style.setProperty('scroll-behavior', 'auto', 'important');
+  window.scrollTo(x, y);
+  restoreInlineStyles(document.documentElement, rootStyles);
+}
+dialog.addEventListener('close', () => { if (!dialog.open) unlockDishPageScroll(); });
+window.addEventListener('pagehide', unlockDishPageScroll);
+window.addEventListener('pageshow', () => { if (dialog.open) lockDishPageScroll(); });
 const dishCards = [];
 let itemDiscounts = new Map(), discountFetchSequence = 0, refreshOpenDishPrice = null;
 function salePrice(price, discount) {
@@ -139,7 +194,11 @@ function openDish(product, category) {
   options.onchange = updatePrice;
   quantityInput.oninput = updatePrice;
   updatePrice();
-  dialog.showModal();
+  if (!dialog.open) {
+    lockDishPageScroll();
+    try { dialog.showModal(); }
+    catch (error) { unlockDishPageScroll(); throw error; }
+  }
   dialog.querySelector('.dialog-scroll').scrollTop = 0;
 }
 async function loadMenu() {
