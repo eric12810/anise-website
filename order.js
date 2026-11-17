@@ -462,6 +462,32 @@ detailsMessage.setAttribute('role', 'status');
 const detailsSummaryTitle = element('h3', 'Order summary');
 const editBasket = element('button', 'Edit basket', 'details-edit');
 editBasket.type = 'button';
+const paymentMain = element('section', null, 'details-main payment-main');
+paymentMain.hidden = true;
+const paymentTitle = element('h1', 'Payment');
+paymentTitle.id = 'payment-page-title';
+const paymentHeader = element('div', null, 'details-header payment-header');
+paymentHeader.hidden = true;
+const backToDetails = element('button', '← Back to details', 'details-back');
+backToDetails.type = 'button';
+paymentHeader.append(backToDetails);
+const paymentProgressWrap = detailsProgressWrap.cloneNode(true);
+paymentProgressWrap.classList.add('payment-progress-wrap');
+paymentProgressWrap.hidden = true;
+paymentProgressWrap.querySelectorAll('li').forEach((step, index) => {
+  step.removeAttribute('aria-current');
+  step.classList.toggle('is-complete', index < 2);
+  step.setAttribute('aria-label', `Step ${index + 1} of 3: ${['Basket, completed', 'Details, completed', 'Payment, current'][index]}`);
+  if (index === 2) step.setAttribute('aria-current', 'step');
+});
+const customerSummary = element('div', null, 'payment-customer-summary');
+const editDetails = element('button', 'Edit details', 'details-edit');
+editDetails.type = 'button';
+const paymentMethods = checkoutForm.querySelector('fieldset');
+const paymentReview = checkoutForm.querySelector('.checkout-review');
+const paymentStatus = document.querySelector('#checkout-status');
+const paymentSubmit = checkoutForm.querySelector('button[type="submit"]');
+paymentMain.append(paymentTitle, customerSummary, editDetails, paymentMethods, paymentReview, paymentStatus, paymentSubmit);
 detailsAside.append(detailsSummaryTitle, editBasket, document.querySelector('#checkout-fulfilment'));
 const detailsFields = ['checkout-name','checkout-name-error','checkout-phone','checkout-phone-error','checkout-email','checkout-email-error','checkout-delivery'].map(id => document.getElementById(id));
 const detailsLabels = ['checkout-name','checkout-phone','checkout-email'].map(id => detailsForm.querySelector(`label[for="${id}"]`));
@@ -484,8 +510,8 @@ for (const id of ['checkout-address-line1', 'checkout-address-line2', 'checkout-
 detailsMain.append(detailsFields[6], document.querySelector('#outside-radius-warning'), detailsAction, detailsMessage);
 detailsMain.prepend(detailsTitle);
 detailsAside.append(document.querySelector('#checkout-summary'), document.querySelector('#delivery-fee-row'), document.querySelector('#promo-discount-row'), document.querySelector('#offer-row'), document.querySelector('#checkout-total').parentElement);
-detailsColumns.append(detailsMain, detailsAside);
-detailsForm.prepend(detailsHeader, detailsProgressWrap, detailsColumns);
+detailsColumns.append(detailsMain, paymentMain, detailsAside);
+detailsForm.prepend(detailsHeader, paymentHeader, detailsProgressWrap, paymentProgressWrap, detailsColumns);
 function refreshDetailsSummary() {
   if (!checkoutDialog.open) return;
   const summary = document.querySelector('#checkout-summary');
@@ -522,7 +548,9 @@ function openDetails() {
   basketDialog.close();
   checkoutDialog.show();
   document.body.classList.add('details-active');
+  document.body.classList.remove('payment-active');
   setDetailsOrderType();
+  showDetails(false);
   refreshPotentialOffer();
   history.pushState({aniseDetails: true}, '', '#details');
   window.scrollTo(0, 0);
@@ -531,13 +559,44 @@ function openDetails() {
 }
 function closeDetails(openBasket = false) {
   checkoutDialog.close();
-  document.body.classList.remove('details-active');
-  if (location.hash === '#details') history.replaceState(null, '', location.pathname + location.search);
+  document.body.classList.remove('details-active', 'payment-active');
+  if (location.hash === '#details' || location.hash === '#payment') history.replaceState(null, '', location.pathname + location.search);
   if (openBasket) basketDialog.showModal();
+}
+function showDetails(updateHistory = true) {
+  document.body.classList.remove('payment-active');
+  detailsMain.hidden = false; paymentMain.hidden = true;
+  detailsHeader.hidden = false; paymentHeader.hidden = true;
+  detailsProgressWrap.hidden = false; paymentProgressWrap.hidden = true;
+  checkoutDialog.setAttribute('aria-labelledby', 'details-page-title');
+  if (updateHistory) history.replaceState({aniseDetails:true}, '', '#details');
+  detailsTitle.focus();
+}
+function showPayment() {
+  const address = [checkoutForm.elements.addressLine1.value.trim(), checkoutForm.elements.addressLine2.value.trim(), checkoutForm.elements.postcode.value.trim()].filter(Boolean).join(', ');
+  customerSummary.replaceChildren(
+    element('strong', checkoutDelivery.hidden ? 'Collection' : 'Delivery'),
+    element('span', checkoutForm.elements.name.value.trim()),
+    element('span', checkoutForm.elements.phone.value.trim() + ' · ' + checkoutForm.elements.email.value.trim())
+  );
+  customerSummary.append(element('span', checkoutDelivery.hidden ? 'Collect from 1 Kent House, Ferdinand Street, London NW1 8ET' : address));
+  detailsMain.hidden = true; paymentMain.hidden = false;
+  detailsHeader.hidden = true; paymentHeader.hidden = false;
+  detailsProgressWrap.hidden = true; paymentProgressWrap.hidden = false;
+  document.body.classList.add('payment-active');
+  checkoutDialog.setAttribute('aria-labelledby', 'payment-page-title');
+  refreshDetailsSummary();
+  updateCheckoutPayment();
+  history.pushState({anisePayment:true}, '', '#payment');
+  window.scrollTo(0, 0);
+  paymentTitle.setAttribute('tabindex', '-1');
+  paymentTitle.focus();
 }
 backToBasket.addEventListener('click', () => closeDetails(true));
 editBasket.addEventListener('click', () => closeDetails(true));
-window.addEventListener('popstate', () => { if (checkoutDialog.open) closeDetails(true); });
+backToDetails.addEventListener('click', () => showDetails());
+editDetails.addEventListener('click', () => showDetails());
+window.addEventListener('popstate', () => { if (checkoutDialog.open) { if (document.body.classList.contains('payment-active')) showDetails(); else closeDetails(true); } });
 detailsAction.addEventListener('click', () => {
   detailsMessage.textContent = '';
   const subtotal = [...selected.values()].reduce((sum, item) => sum + item.quantity * item.price, 0);
@@ -547,7 +606,8 @@ detailsAction.addEventListener('click', () => {
   if (!valid) { const field = checkoutFields.find(input => input.getAttribute('aria-invalid') === 'true'); field?.focus(); detailsMessage.textContent = 'Please correct the highlighted fields.'; return; }
   if (!checkoutDelivery.hidden && confirmedDeliveryFee === null) { deliveryPostcode.focus(); detailsMessage.textContent = 'Enter a valid delivery address and wait for availability to be confirmed.'; return; }
   if (deliveryRequiresApproval && !document.querySelector('#outside-radius-acknowledgement').checked) { document.querySelector('#outside-radius-acknowledgement').focus(); detailsMessage.textContent = 'Please acknowledge the delivery radius notice.'; return; }
-  detailsMessage.textContent = 'Payment will be available in the next step.';
+  detailsMessage.textContent = '';
+  showPayment();
 });
 let potentialSaving = 0, potentialOffer = null, potentialSequence = 0, acceptedOfferSignature = null;
 function selectedItemPotential() {
@@ -800,7 +860,7 @@ function updateCheckoutPayment() {
   const cash = checkoutForm.elements.payment.value === 'cash';
   document.querySelector('#checkout-review-payment').textContent = cash ? 'Cash' : 'Card';
   checkoutSubmit.disabled = checkingOffer || (!cash && !cardAvailable);
-  checkoutSubmit.textContent = cash ? 'Place cash order' : 'Continue to card payment';
+  checkoutSubmit.textContent = cash ? 'Place order' : 'Pay securely';
   checkoutStatus.textContent = cash ? 'Your order will be sent to the restaurant for confirmation. Cash payment is due on collection or delivery.' : cardAvailable ? 'You will continue to Stripe’s secure checkout. Your order will be sent to the restaurant after payment is confirmed.' : 'Card payment is not available yet.';
 }
 checkoutForm.addEventListener('change', event => {
@@ -818,14 +878,14 @@ checkoutForm.addEventListener('input', () => {
 });
 checkoutForm.addEventListener('submit', async event => {
   event.preventDefault();
-  if (document.body.classList.contains('details-active')) return;
+  if (!document.body.classList.contains('payment-active')) return;
   if (location.protocol !== 'https:') { showCheckoutError('Please open the secure website before placing your order.'); return; }
   if (checkingOffer) return;
   clearCheckoutError();
   const foodSubtotal = [...selected.values()].reduce((sum, item) => sum + item.quantity * item.price, 0);
   if (!checkoutDelivery.hidden && Math.round(foodSubtotal * 100) < 1800) { showCheckoutError('The minimum food subtotal for delivery is £18.00.'); return; }
   const validFields = checkoutFields.map(validateCheckoutField).every(Boolean);
-  if (!validFields) { showCheckoutError('Please correct the highlighted fields before continuing.', checkoutFields.find(input => input.getAttribute('aria-invalid') === 'true')); return; }
+  if (!validFields) { showDetails(); showCheckoutError('Please correct the highlighted fields before continuing.', checkoutFields.find(input => input.getAttribute('aria-invalid') === 'true')); return; }
   if (!checkoutForm.reportValidity()) return;
   if (!selected.size) { showCheckoutError('Your basket is empty. Add a dish before placing your order.'); return; }
   if (checkoutForm.elements.payment.value === 'card' && !cardAvailable) { showCheckoutError('Card payment is not available. Please choose another payment method.'); return; }

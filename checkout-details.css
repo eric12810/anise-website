@@ -28,6 +28,16 @@
 .details-summary{position:sticky;top:138px;padding:26px;background:#fff;border:1px solid #e3dbcf}
 .details-summary h3{display:inline-block;margin:0 14px 18px 0}
 .details-main h1,.details-summary h3{font-family:var(--sans);font-size:24px;font-weight:400;line-height:1.2;letter-spacing:normal}
+.payment-main > *{grid-column:1/-1}
+.payment-customer-summary{display:grid;gap:5px;padding:14px 0;border-top:1px solid #e3dbcf;border-bottom:1px solid #e3dbcf;font:14px/1.5 var(--sans)}
+.payment-customer-summary span{overflow-wrap:anywhere;color:#655c52}
+.payment-main .details-edit{justify-self:start;margin-top:-6px}
+.payment-main fieldset{display:flex;flex-wrap:wrap;gap:12px;margin:0;padding:0;border:0}
+.payment-main fieldset legend{margin-bottom:10px}
+.payment-main fieldset label{display:flex;align-items:center;gap:7px;padding:10px 14px;border:1px solid #e3dbcf;cursor:pointer}
+.payment-main .checkout-review{margin:0}
+.payment-main #checkout-status{margin:0;font-size:13px;line-height:1.5}
+.payment-main button[type=submit]{width:100%;padding:17px 20px;text-align:left;text-transform:uppercase;letter-spacing:.13em;font:600 13px var(--sans);cursor:pointer}
 .details-summary #checkout-fulfilment{margin:0 0 12px;color:#796d62;font:13px/1.5 var(--serif)}
 .details-summary .checkout-summary-row{font-size:14px}
 .details-summary .checkout-summary-row:last-child{border-bottom:0}
