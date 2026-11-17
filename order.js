@@ -15,8 +15,93 @@ const quantityInput = document.querySelector('#dish-quantity');
 const notesInput = document.querySelector('#dish-notes');
 const options = document.querySelector('#dish-options');
 const selected = new Map();
+const basketStorage = window.AniseBasketStorage;
+let menuCategories = null;
+let basketReady = false;
+let basketRevision = 0;
+const basketNotice = document.createElement('p');
+basketNotice.className = 'basket-restore-notice';
+basketNotice.setAttribute('role', 'status');
+document.querySelector('#basket-page .basket-page-header').append(basketNotice);
+const menuBasketNotice = basketNotice.cloneNode();
+document.querySelector('#menu-status').after(menuBasketNotice);
+function notifyBasket(message) { basketNotice.textContent = message; menuBasketNotice.textContent = message; }
+function orderType() { return document.querySelector('.fulfilment button.selected').textContent.trim(); }
+function saveBasket() {
+  if (!basketReady) return;
+  basketStorage.write([...selected.values()], orderType());
+}
+function restoreBasket(saved, categories) {
+  const {entries, notices} = basketStorage.resolve(saved, categories);
+  selected.clear();
+  entries.forEach((item, key) => selected.set(key, item));
+  document.querySelectorAll('.fulfilment button').forEach(button => {
+    const active = button.textContent.trim() === (saved?.orderType || 'Collection');
+    button.classList.toggle('selected', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  notifyBasket([...new Set(notices)].join(' '));
+  confirmedDeliveryFee = null;
+  render();
+}
+let confirmedDeliveryFee = null;
 const money = value => new Intl.NumberFormat('en-GB', {style: 'currency', currency: 'GBP'}).format(value);
 let currentDish;
+let dishScrollLock = null;
+let dishRemovalObserver = null;
+const dishLockedBodyStyles = ['position', 'top', 'left', 'width', 'overflow'];
+const dishLockedRootStyles = ['overflow-y', 'overscroll-behavior', 'scroll-behavior'];
+function saveInlineStyles(element, properties) {
+  return properties.map(property => [property, element.style.getPropertyValue(property), element.style.getPropertyPriority(property)]);
+}
+function restoreInlineStyles(element, styles) {
+  styles.forEach(([property, value, priority]) => {
+    if (value) element.style.setProperty(property, value, priority);
+    else element.style.removeProperty(property);
+  });
+}
+function updateDishLockedWidth() {
+  if (dishScrollLock) document.body.style.width = `${document.documentElement.clientWidth}px`;
+}
+function lockDishPageScroll() {
+  if (dishScrollLock) return;
+  const root = document.documentElement;
+  const body = document.body;
+  dishScrollLock = {
+    x: window.scrollX, y: window.scrollY,
+    bodyStyles: saveInlineStyles(body, dishLockedBodyStyles),
+    rootStyles: saveInlineStyles(root, dishLockedRootStyles)
+  };
+  const hasScrollbarGutter = window.innerWidth > root.clientWidth;
+  // Keep the desktop scrollbar space while the fixed body leaves normal flow.
+  root.style.overflowY = hasScrollbarGutter ? 'scroll' : 'hidden';
+  root.style.overscrollBehavior = 'none';
+  body.style.position = 'fixed';
+  body.style.top = `-${dishScrollLock.y}px`;
+  body.style.left = `-${dishScrollLock.x}px`;
+  body.style.overflow = 'hidden';
+  updateDishLockedWidth();
+  window.addEventListener('resize', updateDishLockedWidth);
+  dishRemovalObserver = new MutationObserver(() => { if (!dialog.isConnected) unlockDishPageScroll(); });
+  dishRemovalObserver.observe(body, {childList: true});
+}
+function unlockDishPageScroll() {
+  if (!dishScrollLock) return;
+  const {x, y, bodyStyles, rootStyles} = dishScrollLock;
+  dishScrollLock = null;
+  dishRemovalObserver?.disconnect();
+  dishRemovalObserver = null;
+  window.removeEventListener('resize', updateDishLockedWidth);
+  restoreInlineStyles(document.body, bodyStyles);
+  restoreInlineStyles(document.documentElement, rootStyles);
+  // The site's smooth scrolling must not animate the saved position back.
+  document.documentElement.style.setProperty('scroll-behavior', 'auto', 'important');
+  window.scrollTo(x, y);
+  restoreInlineStyles(document.documentElement, rootStyles);
+}
+dialog.addEventListener('close', () => { if (!dialog.open) unlockDishPageScroll(); });
+window.addEventListener('pagehide', unlockDishPageScroll);
+window.addEventListener('pageshow', () => { if (dialog.open) lockDishPageScroll(); });
 const dishCards = [];
 let itemDiscounts = new Map(), discountFetchSequence = 0, refreshOpenDishPrice = null;
 function salePrice(price, discount) {
@@ -26,12 +111,12 @@ function salePrice(price, discount) {
 function priceLabel(price, discount, prefix = '') {
   return discount && salePrice(price, discount) < price ? `${prefix}originally ${money(price)}, offer price ${money(salePrice(price, discount))}${discount.minimumSubtotal ? ` with a minimum food order of ${money(discount.minimumSubtotal)}` : ''}` : prefix + money(price);
 }
-function renderDishPrice(target, price, discount, prefix = '') {
+function renderDishPrice(target, price, discount, prefix = '', quantity = 1) {
   target.replaceChildren();
   if (prefix) target.append(document.createTextNode(prefix));
-  if (!discount || salePrice(price, discount) >= price) { target.append(document.createTextNode(money(price))); return; }
-  const old = element('s', money(price), 'dish-price-old'); old.setAttribute('aria-label', 'Original price ' + money(price));
-  const current = element('strong', money(salePrice(price, discount)), 'dish-price-sale'); current.setAttribute('aria-label', 'Offer price ' + money(salePrice(price, discount)));
+  if (!discount || salePrice(price, discount) >= price) { target.append(document.createTextNode(money(price * quantity))); return; }
+  const old = element('s', money(price * quantity), 'dish-price-old'); old.setAttribute('aria-label', 'Original price ' + money(price * quantity));
+  const current = element('strong', money(salePrice(price, discount) * quantity), 'dish-price-sale'); current.setAttribute('aria-label', 'Offer price ' + money(salePrice(price, discount) * quantity));
   target.append(old, document.createTextNode(' '), current);
   if (discount.minimumSubtotal) target.append(element('small', `Minimum food order ${money(discount.minimumSubtotal)}`, 'dish-price-condition'));
 }
@@ -127,7 +212,7 @@ function openDish(product, category) {
     (product.modifierGroups || []).forEach((group, index) => {
       options.querySelectorAll(`input[name="modifier-${index}"]:checked`).forEach(input => { price += group.modifiers[Number(input.value)].priceAdjustment; });
     });
-    renderDishPrice(document.querySelector('.dialog-price'), price, itemDiscounts.get(product.id));
+    renderDishPrice(document.querySelector('.dialog-price'), price, itemDiscounts.get(product.id), '', Number(quantityInput.value) || 1);
   };
   refreshOpenDishPrice = () => {
     options.querySelectorAll('input[name="dish-variant"]').forEach(input => {
@@ -136,8 +221,15 @@ function openDish(product, category) {
     });
     updatePrice();
   };
-  options.onchange = updatePrice; updatePrice();
-  dialog.showModal();
+  options.onchange = updatePrice;
+  quantityInput.oninput = updatePrice;
+  updatePrice();
+  if (!dialog.open) {
+    lockDishPageScroll();
+    try { dialog.showModal(); }
+    catch (error) { unlockDishPageScroll(); throw error; }
+  }
+  dialog.querySelector('.dialog-scroll').scrollTop = 0;
 }
 async function loadMenu() {
   const status = document.querySelector('#menu-status');
@@ -161,6 +253,7 @@ async function loadMenu() {
       categories = await response.json();
     }
     if (!Array.isArray(categories)) throw new Error('Invalid menu');
+    menuCategories = categories;
     let displayed = 0;
     categories.forEach((category, index) => {
       if (!Array.isArray(category.products)) return;
@@ -214,6 +307,12 @@ async function loadMenu() {
     });
     status.textContent = displayed ? '' : 'There are no dishes available right now. Please call us for the current menu.';
     updateDishPrices();
+    const saved = basketStorage.read();
+    if (saved && basketRevision === 0 && !new URLSearchParams(location.search).has('stripe_cancel')) restoreBasket(saved, categories);
+    basketReady = true;
+    render();
+    if (saved && basketRevision === 0 && !new URLSearchParams(location.search).has('stripe_cancel'))
+      basketStorage.write([...selected.values()], orderType(), saved.expiresAt);
   } catch (_) {
     status.textContent = 'The menu is temporarily unavailable. Please call us on 020 7916 4976 for the current menu.';
   }
@@ -275,11 +374,14 @@ form.addEventListener('submit', event => {
   const key = JSON.stringify([variant.id, modifiers.map(m => m.id).sort(), notes]);
   const entry = selected.get(key) || {variantId: variant.id, productId: currentDish.id, displayedDiscount: itemDiscounts.get(currentDish.id) ? {...itemDiscounts.get(currentDish.id), orderType: document.querySelector('.fulfilment button.selected').textContent.trim()} : null, name: currentDish.name, variant: variant.name, notes, modifiers, price: variant.price + modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0), quantity: 0};
   entry.quantity += Number(quantityInput.value); selected.set(key, entry); render(); dialog.close();
+  basketRevision++; saveBasket();
 });
+
 dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
 function change(key, amount) {
   const entry = selected.get(key); if (!entry) return;
   entry.quantity += amount; if (entry.quantity <= 0) selected.delete(key); render();
+  basketRevision++; saveBasket();
 }
 let deliveryMinimumAttempted = false;
 function render() {
@@ -291,11 +393,17 @@ function render() {
   if (!delivery || Math.round(subtotal * 100) >= 1800) deliveryMinimumAttempted = false;
   document.querySelector('#fulfilment-note').classList.toggle('delivery-minimum-error', deliveryMinimumAttempted);
   document.querySelector('#fulfilment-note').textContent = delivery
-    ? (Math.round(subtotal * 100) < 1800 ? `Minimum food subtotal for delivery is £18.00. Add ${money((1800 - Math.round(subtotal * 100)) / 100)} more.` : 'Minimum food subtotal for delivery is £18.00. Delivery availability and charges are confirmed by postcode.')
+    ? (Math.round(subtotal * 100) < 1800 ? `Minimum food subtotal for delivery is £18.00. Add ${money((1800 - Math.round(subtotal * 100)) / 100)} more.` : '')
     : 'Collect your order from Anise in Camden.';
   document.querySelector('.basket-trigger-count').textContent = `(${total})`;
   document.querySelector('.basket-trigger strong').textContent = money(subtotal);
   document.querySelector('#basket-subtotal').textContent = money(subtotal);
+  const basketFee = delivery ? confirmedDeliveryFee : null;
+  document.querySelector('#basket-delivery-fee-row').hidden = basketFee === null;
+  if (basketFee !== null) document.querySelector('#basket-delivery-fee').textContent = money(basketFee);
+  document.querySelector('#basket-total').textContent = money(subtotal + (basketFee || 0));
+  document.querySelector('#basket-charge-note').hidden = !delivery || basketFee !== null;
+  if (document.querySelector('.checkout-dialog')?.open) refreshDetailsSummary();
   basket.replaceChildren();
   if (!total) { const empty = element('div', null, 'empty'); empty.innerHTML = '<span aria-hidden="true">✳</span><p>Your table awaits.</p><small>Add a dish to start your basket.</small>'; basket.append(empty); return; }
   selected.forEach((item, key) => {
@@ -303,21 +411,53 @@ function render() {
     details.append(element('strong', item.name), element('p', `${item.variant} · ${money(item.price)} each`, 'basket-item-note'));
     if (item.modifiers.length) details.append(element('p', item.modifiers.map(m => m.name).join(', '), 'basket-item-note'));
     if (item.notes) details.append(element('p', `Note: ${item.notes}`, 'basket-item-note'));
+    details.append(element('span', money(item.price * item.quantity), 'basket-line-total'));
     const controls = element('div', null, 'quantity');
     const minus = element('button', '−'); minus.type = 'button'; minus.setAttribute('aria-label', `Remove one ${item.name}`); minus.addEventListener('click', () => change(key, -1));
     const plus = element('button', '+'); plus.type = 'button'; plus.setAttribute('aria-label', `Add one ${item.name}`); plus.addEventListener('click', () => change(key, 1));
-    controls.append(minus, element('span', item.quantity), plus); row.append(details, controls); basket.append(row);
+    const remove = element('button', 'Remove', 'basket-remove'); remove.type = 'button';
+    remove.setAttribute('aria-label', `Remove ${item.name}`);
+    remove.addEventListener('click', () => { selected.delete(key); basketRevision++; render(); saveBasket(); });
+    controls.append(minus, element('span', item.quantity), plus);
+    row.append(details, controls, remove); basket.append(row);
   });
 }
 document.querySelectorAll('.fulfilment button').forEach(button => button.addEventListener('click', () => {
+  if (button.classList.contains('selected')) return;
   document.querySelectorAll('.fulfilment button').forEach(other => { other.classList.toggle('selected', other === button); other.setAttribute('aria-pressed', String(other === button)); });
+  clearDeliveryQuote();
   render();
+  basketRevision++; saveBasket();
   refreshItemDiscounts();
 }));
-const basketDialog = document.querySelector('.basket-dialog');
-document.querySelector('.basket-trigger').addEventListener('click', () => basketDialog.showModal());
-basketDialog.addEventListener('click', event => { if (event.target === basketDialog) basketDialog.close(); });
-loadMenu();
+const basketPage = document.querySelector('#basket-page');
+function showBasket(updateHistory = true) {
+  if (checkoutDialog.open) checkoutDialog.close();
+  basketPage.hidden = false;
+  document.body.classList.remove('details-active', 'payment-active');
+  document.body.classList.add('basket-active');
+  render();
+  if (updateHistory) history.pushState({aniseBasket:true}, '', '#basket');
+  window.scrollTo(0, 0);
+  document.querySelector('#basket-title').focus();
+}
+function showMenu(updateHistory = true) {
+  if (checkoutDialog.open) checkoutDialog.close();
+  basketPage.hidden = true;
+  document.body.classList.remove('basket-active', 'details-active', 'payment-active');
+  if (updateHistory) history.pushState(null, '', location.pathname + location.search);
+  window.scrollTo(0, 0);
+  document.querySelector('.basket-trigger').focus();
+}
+document.querySelector('.basket-trigger').addEventListener('click', () => showBasket());
+document.querySelector('#continue-browsing').addEventListener('click', event => { event.preventDefault(); showMenu(); });
+const menuLoad = loadMenu();
+window.addEventListener('storage', event => {
+  if (event.key !== basketStorage.key || !menuCategories) return;
+  const saved = basketStorage.read();
+  restoreBasket(saved, menuCategories);
+  basketReady = true;
+});
 refreshItemDiscounts();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshItemDiscounts(); });
 setInterval(() => { if (!document.hidden) refreshItemDiscounts(); }, 60000);
@@ -370,6 +510,203 @@ const checkoutDialog = document.querySelector('.checkout-dialog');
 const checkoutOpen = document.querySelector('#checkout-open');
 const checkoutForm = document.querySelector('#checkout-form');
 const checkoutDelivery = document.querySelector('#checkout-delivery');
+const detailsForm = checkoutForm;
+const detailsMain = element('div', null, 'details-main');
+const detailsAside = element('aside', null, 'details-summary');
+const detailsColumns = element('div', null, 'details-columns');
+const detailsProgress = document.querySelector('.checkout-progress').cloneNode(true);
+detailsProgress.querySelectorAll('li').forEach((step, index) => {
+  step.removeAttribute('aria-current');
+  step.setAttribute('aria-label', `Step ${index + 1} of 3: ${['Basket, completed', 'Details, current', 'Payment'][index]}`);
+  if (index === 0) step.classList.add('is-complete');
+  if (index === 1) step.setAttribute('aria-current', 'step');
+});
+checkoutDialog.classList.add('details-page');
+document.querySelector('main').append(checkoutDialog);
+const detailsHeader = element('div', null, 'details-header');
+const backToBasket = element('button', '← Back to basket', 'details-back');
+backToBasket.type = 'button';
+const detailsTitle = element('h1', 'A few details');
+detailsTitle.id = 'details-page-title';
+detailsHeader.append(backToBasket);
+const detailsProgressWrap = element('div', null, 'details-progress-wrap');
+detailsProgressWrap.append(detailsProgress);
+checkoutDialog.setAttribute('aria-labelledby', 'details-page-title');
+const detailsAction = element('button', 'Continue to payment  ›', 'details-continue');
+detailsAction.type = 'button';
+const detailsMessage = element('p', '', 'details-message');
+detailsMessage.setAttribute('role', 'status');
+const detailsSummaryTitle = element('h3', 'Order summary');
+const editBasket = element('button', 'Edit basket', 'details-edit');
+editBasket.type = 'button';
+const paymentMain = element('section', null, 'details-main payment-main');
+paymentMain.hidden = true;
+const paymentTitle = element('h1', 'Payment');
+paymentTitle.id = 'payment-page-title';
+const paymentHeader = element('div', null, 'details-header payment-header');
+paymentHeader.hidden = true;
+const backToDetails = element('button', '← Back to details', 'details-back');
+backToDetails.type = 'button';
+paymentHeader.append(backToDetails);
+const paymentProgressWrap = detailsProgressWrap.cloneNode(true);
+paymentProgressWrap.classList.add('payment-progress-wrap');
+paymentProgressWrap.hidden = true;
+paymentProgressWrap.querySelectorAll('li').forEach((step, index) => {
+  step.removeAttribute('aria-current');
+  step.classList.toggle('is-complete', index < 2);
+  step.setAttribute('aria-label', `Step ${index + 1} of 3: ${['Basket, completed', 'Details, completed', 'Payment, current'][index]}`);
+  if (index === 2) step.setAttribute('aria-current', 'step');
+});
+const customerSummary = element('div', null, 'payment-customer-summary');
+const editDetails = element('button', 'Edit details', 'details-edit');
+editDetails.type = 'button';
+const paymentMethods = checkoutForm.querySelector('fieldset');
+const paymentReview = checkoutForm.querySelector('.checkout-review');
+const outsideRadiusWarning = document.querySelector('#outside-radius-warning');
+const paymentStatus = document.querySelector('#checkout-status');
+const paymentSubmit = checkoutForm.querySelector('button[type="submit"]');
+const paymentReturnMessage = element('p', '', 'payment-return-message');
+paymentReturnMessage.setAttribute('role', 'status');
+paymentReturnMessage.hidden = true;
+paymentMain.append(paymentTitle, customerSummary, editDetails, paymentReturnMessage, paymentMethods, paymentReview, paymentStatus, paymentSubmit);
+detailsAside.append(detailsSummaryTitle, editBasket, document.querySelector('#checkout-fulfilment'));
+const detailsFields = ['checkout-name','checkout-name-error','checkout-phone','checkout-phone-error','checkout-email','checkout-email-error','checkout-delivery'].map(id => document.getElementById(id));
+const detailsLabels = ['checkout-name','checkout-phone','checkout-email'].map(id => detailsForm.querySelector(`label[for="${id}"]`));
+function detailsField(label, input, error) {
+  const field = element('div', null, 'details-field');
+  field.append(label, input, error);
+  return field;
+}
+for (let i = 0; i < 3; i++) {
+  const field = detailsField(detailsLabels[i], detailsFields[i * 2], detailsFields[i * 2 + 1]);
+  if (i === 2) field.classList.add('details-email');
+  detailsMain.append(field);
+}
+for (const id of ['checkout-address-line1', 'checkout-address-line2', 'checkout-postcode']) {
+  const input = document.getElementById(id);
+  const label = checkoutDelivery.querySelector(`label[for="${id}"]`);
+  const error = document.getElementById(id + '-error');
+  checkoutDelivery.insertBefore(detailsField(label, input, error), checkoutDelivery.querySelector('#delivery-result'));
+}
+detailsMain.append(detailsFields[6], outsideRadiusWarning, detailsAction, detailsMessage);
+detailsMain.prepend(detailsTitle);
+detailsAside.append(document.querySelector('#checkout-summary'), document.querySelector('#delivery-fee-row'), document.querySelector('#promo-discount-row'), document.querySelector('#offer-row'), document.querySelector('#checkout-total').parentElement);
+detailsColumns.append(detailsMain, paymentMain, detailsAside);
+detailsForm.prepend(detailsHeader, paymentHeader, detailsProgressWrap, paymentProgressWrap, detailsColumns);
+function refreshDetailsSummary() {
+  if (!checkoutDialog.open) return;
+  const summary = document.querySelector('#checkout-summary');
+  summary.replaceChildren();
+  const subtotal = [...selected.values()].reduce((sum, item) => sum + item.price * item.quantity, 0);
+  selected.forEach(item => {
+    const row = element('div', null, 'checkout-summary-row');
+    const description = element('div');
+    description.append(element('strong', `${item.quantity} × ${item.name}`), element('small', [item.variant, ...item.modifiers.map(m => m.name)].join(' · ')));
+    if (item.notes) description.append(element('small', `Note: ${item.notes}`));
+    row.append(description, element('span', money(item.price * item.quantity)));
+    summary.append(row);
+  });
+  let subtotalRow = document.querySelector('#details-subtotal');
+  if (!subtotalRow) { subtotalRow = element('p', null, 'checkout-total'); subtotalRow.id = 'details-subtotal'; detailsAside.insertBefore(subtotalRow, document.querySelector('#delivery-fee-row')); }
+  subtotalRow.replaceChildren(element('span', 'Subtotal'), element('strong', money(subtotal)));
+  showPromo(subtotal);
+  document.querySelector('#checkout-total').textContent = money(promoTotal(subtotal, checkoutDelivery.hidden ? 0 : (confirmedDeliveryFee || 0)));
+  document.querySelector('#checkout-review-total').textContent = !checkoutDelivery.hidden && confirmedDeliveryFee === null
+    ? 'Delivery check required' : document.querySelector('#checkout-total').textContent;
+}
+let detailsOrderType = null;
+function setDetailsOrderType() {
+  const delivery = document.querySelector('.fulfilment button.selected').textContent.trim() === 'Delivery';
+  const orderType = delivery ? 'Delivery' : 'Collection';
+  checkoutDelivery.hidden = !delivery;
+  checkoutDelivery.querySelector('#checkout-address-line1').required = delivery;
+  checkoutDelivery.querySelector('#checkout-postcode').required = delivery;
+  const fulfilmentSummary = document.querySelector('#checkout-fulfilment');
+  fulfilmentSummary.hidden = delivery;
+  fulfilmentSummary.textContent = delivery ? '' : 'Collection · 1 Kent House, Ferdinand Street, London NW1 8ET';
+  if (detailsOrderType !== orderType) clearDeliveryQuote();
+  detailsOrderType = orderType;
+  refreshDetailsSummary();
+  if (delivery) scheduleDeliveryCheck();
+}
+function openDetails() {
+  basketPage.hidden = true;
+  checkoutDialog.show();
+  document.body.classList.remove('basket-active');
+  document.body.classList.add('details-active');
+  document.body.classList.remove('payment-active');
+  setDetailsOrderType();
+  showDetails(false);
+  refreshPotentialOffer();
+  history.pushState({aniseDetails: true}, '', '#details');
+  window.scrollTo(0, 0);
+  detailsTitle.setAttribute('tabindex', '-1');
+  detailsTitle.focus();
+}
+function closeDetails(openBasket = false) {
+  checkoutDialog.close();
+  if (openBasket) showBasket();
+  else showMenu();
+}
+function showDetails(updateHistory = true) {
+  document.body.classList.remove('payment-active');
+  detailsMain.hidden = false; paymentMain.hidden = true;
+  detailsHeader.hidden = false; paymentHeader.hidden = true;
+  detailsProgressWrap.hidden = false; paymentProgressWrap.hidden = true;
+  checkoutDialog.setAttribute('aria-labelledby', 'details-page-title');
+  if (updateHistory) history.replaceState({aniseDetails:true}, '', '#details');
+  detailsTitle.focus();
+}
+function showPayment(updateHistory = true) {
+  const address = [checkoutForm.elements.addressLine1.value.trim(), checkoutForm.elements.addressLine2.value.trim(), checkoutForm.elements.postcode.value.trim()].filter(Boolean).join(', ');
+  const customerRow = (label, value) => {
+    const row = element('div', null, 'payment-customer-row');
+    row.append(element('span', label), element('strong', value));
+    return row;
+  };
+  customerSummary.replaceChildren(customerRow('Name', checkoutForm.elements.name.value.trim()));
+  if (!checkoutDelivery.hidden) customerSummary.append(customerRow('Address', address));
+  customerSummary.append(customerRow('Phone number', checkoutForm.elements.phone.value.trim()), customerRow('Email', checkoutForm.elements.email.value.trim()));
+  detailsMain.hidden = true; paymentMain.hidden = false;
+  detailsHeader.hidden = true; paymentHeader.hidden = false;
+  detailsProgressWrap.hidden = true; paymentProgressWrap.hidden = false;
+  document.body.classList.add('payment-active');
+  checkoutDialog.setAttribute('aria-labelledby', 'payment-page-title');
+  refreshDetailsSummary();
+  updateCheckoutPayment();
+  if (updateHistory) history.pushState({anisePayment:true}, '', '#payment');
+  window.scrollTo(0, 0);
+  paymentTitle.setAttribute('tabindex', '-1');
+  paymentTitle.focus();
+}
+backToBasket.addEventListener('click', () => closeDetails(true));
+editBasket.addEventListener('click', () => closeDetails(true));
+backToDetails.addEventListener('click', () => showDetails());
+editDetails.addEventListener('click', () => showDetails());
+window.addEventListener('popstate', () => {
+  if (location.hash === '#basket') showBasket(false);
+  else if (location.hash === '#details' && selected.size) {
+    basketPage.hidden = true;
+    if (!checkoutDialog.open) checkoutDialog.show();
+    document.body.classList.remove('basket-active', 'payment-active');
+    document.body.classList.add('details-active');
+    setDetailsOrderType();
+    showDetails(false);
+  } else if (location.hash === '#payment' && checkoutDialog.open) showPayment(false);
+  else showMenu(false);
+});
+detailsAction.addEventListener('click', () => {
+  detailsMessage.textContent = '';
+  const subtotal = [...selected.values()].reduce((sum, item) => sum + item.quantity * item.price, 0);
+  if (!selected.size) { showCheckoutError('Your basket is empty.'); closeDetails(true); return; }
+  if (!checkoutDelivery.hidden && Math.round(subtotal * 100) < 1800) { detailsMessage.textContent = 'The minimum food subtotal for delivery is £18.00.'; return; }
+  const valid = checkoutFields.map(validateCheckoutField).every(Boolean);
+  if (!valid) { const field = checkoutFields.find(input => input.getAttribute('aria-invalid') === 'true'); field?.focus(); detailsMessage.textContent = 'Please correct the highlighted fields.'; return; }
+  if (!checkoutDelivery.hidden && confirmedDeliveryFee === null) { deliveryPostcode.focus(); detailsMessage.textContent = 'Enter a valid delivery address and wait for availability to be confirmed.'; return; }
+  if (deliveryRequiresApproval && !document.querySelector('#outside-radius-acknowledgement').checked) { document.querySelector('#outside-radius-acknowledgement').focus(); detailsMessage.textContent = 'Please acknowledge the delivery radius notice.'; return; }
+  detailsMessage.textContent = '';
+  showPayment();
+});
 let potentialSaving = 0, potentialOffer = null, potentialSequence = 0, acceptedOfferSignature = null;
 function selectedItemPotential() {
   const groups = new Map();
@@ -441,35 +778,7 @@ checkoutOpen.addEventListener('click', () => {
     note.focus();
     return;
   }
-  clearCheckoutError();
-  reviewedOffer = null; document.querySelector('#offer-row').hidden = true;
-  const delivery = document.querySelector('.fulfilment button.selected').textContent.trim() === 'Delivery';
-  checkoutDelivery.hidden = !delivery;
-  clearDeliveryQuote();
-  checkoutDelivery.querySelectorAll('input').forEach(input => { input.setCustomValidity(''); input.removeAttribute('aria-invalid'); document.getElementById(input.id + '-error').textContent = ''; });
-  document.querySelector('#checkout-fulfilment').textContent = delivery
-    ? 'Delivery · Check your postcode for availability and charge.' : 'Collection · 1 Kent House, Ferdinand Street, London NW1 8ET.';
-  const summary = document.querySelector('#checkout-summary');
-  summary.replaceChildren();
-  let subtotal = 0;
-  selected.forEach(item => {
-    subtotal += item.price * item.quantity;
-    const row = element('div', null, 'checkout-summary-row');
-    const description = element('div');
-    description.append(element('strong', `${item.quantity} × ${item.name}`), element('small', [item.variant, ...item.modifiers.map(m => m.name)].join(' · ')));
-    if (item.notes) description.append(element('small', `Note: ${item.notes}`));
-    row.append(description, element('span', money(item.price * item.quantity)));
-    summary.append(row);
-  });
-  showPromo(subtotal);
-  document.querySelector('#checkout-total').textContent = money(promoTotal(subtotal));
-  document.querySelector('#checkout-review-total').textContent = delivery ? 'Delivery check required' : money(promoTotal(subtotal));
-  document.querySelector('#checkout-review-note').textContent = delivery ? 'Check your postcode to confirm the delivery fee and total.' : 'Prices will be confirmed before your order is placed.';
-  checkoutDelivery.querySelector('#checkout-address-line1').required = delivery;
-  checkoutDelivery.querySelector('#checkout-postcode').required = delivery;
-  basketDialog.close();
-  checkoutDialog.showModal();
-  refreshPotentialOffer();
+  openDetails();
 });
 checkoutDialog.addEventListener('click', event => { if (event.target === checkoutDialog) checkoutDialog.close(); });
 const checkoutFields = ['checkout-name', 'checkout-phone', 'checkout-email', 'checkout-address-line1', 'checkout-address-line2', 'checkout-postcode'].map(id => document.getElementById(id));
@@ -504,7 +813,6 @@ const deliveryFeeRow = document.querySelector('#delivery-fee-row');
 const deliveryPostcode = document.querySelector('#checkout-postcode');
 let deliveryQuoteSequence = 0;
 let pendingDeliverySequence = null;
-let confirmedDeliveryFee = null;
 let deliveryRequiresApproval = false;
 function clearDeliveryQuote() {
   deliveryQuoteSequence++;
@@ -518,17 +826,28 @@ function clearDeliveryQuote() {
   showPromo(subtotal);
   document.querySelector('#checkout-total').textContent = money(promoTotal(subtotal));
   document.querySelector('#checkout-review-total').textContent = checkoutDelivery.hidden ? money(promoTotal(subtotal)) : 'Delivery check required';
-  document.querySelector('#checkout-review-note').textContent = checkoutDelivery.hidden ? 'Prices will be confirmed before your order is placed.' : 'Check your postcode to confirm the delivery fee and total.';
+  const reviewNote = document.querySelector('#checkout-review-note');
+  reviewNote.hidden = false;
+  reviewNote.textContent = checkoutDelivery.hidden ? 'Prices will be confirmed before your order is placed.' : 'Check your postcode to confirm the delivery fee and total.';
 }
 deliveryPostcode.addEventListener('input', () => { clearDeliveryQuote(); potentialSequence++; showPotential(selectedItemPotential()); });
+let deliveryCheckTimer;
+function scheduleDeliveryCheck() {
+  clearTimeout(deliveryCheckTimer);
+  if (checkoutDelivery.hidden || !checkoutDialog.open) return;
+  const line = document.querySelector('#checkout-address-line1');
+  if (!line.value.trim() || !deliveryPostcode.value.trim()) return;
+  if (!validateCheckoutField(line) || !validateCheckoutField(deliveryPostcode)) return;
+  deliveryCheckTimer = setTimeout(checkDeliveryAvailability, 450);
+}
+deliveryPostcode.addEventListener('input', scheduleDeliveryCheck);
+['checkout-address-line1', 'checkout-address-line2'].forEach(id => document.getElementById(id).addEventListener('input', () => { clearDeliveryQuote(); scheduleDeliveryCheck(); }));
 async function checkDeliveryAvailability() {
   if (checkoutDelivery.hidden || pendingDeliverySequence === deliveryQuoteSequence) return;
   clearDeliveryQuote();
-  if (!validateCheckoutField(deliveryPostcode)) return;
+  if (!validateCheckoutField(document.querySelector('#checkout-address-line1')) || !validateCheckoutField(deliveryPostcode)) return;
   const sequence = deliveryQuoteSequence;
   pendingDeliverySequence = sequence;
-  const button = document.querySelector('#check-delivery');
-  button.disabled = true;
   deliveryResult.textContent = 'Checking delivery availability…';
   try {
     const response = await fetch(window.AnisePos.api + '/api/website/delivery-quote', {
@@ -550,17 +869,15 @@ async function checkDeliveryAvailability() {
     document.querySelector('#checkout-total').textContent = money(promoTotal(subtotal, result.deliveryFee));
     document.querySelector('#checkout-review-total').textContent = money(promoTotal(subtotal, result.deliveryFee));
     refreshPotentialOffer();
-    document.querySelector('#checkout-review-note').textContent = deliveryRequiresApproval ? 'This address is outside our normal delivery radius. Anise will review your order and may decline it.' : 'Prices and availability will be checked again when you place your order.';
+    const reviewNote = document.querySelector('#checkout-review-note');
+    reviewNote.hidden = !deliveryRequiresApproval;
+    reviewNote.textContent = deliveryRequiresApproval ? 'This address is outside our normal delivery radius. Anise will review your order and may decline it.' : '';
   } catch (_) {
     if (sequence === deliveryQuoteSequence && !checkoutDelivery.hidden) deliveryResult.textContent = 'Delivery availability is temporarily unavailable. Please try again later.';
   } finally {
-    if (pendingDeliverySequence === sequence) {
-      pendingDeliverySequence = null;
-      button.disabled = false;
-    }
+    if (pendingDeliverySequence === sequence) pendingDeliverySequence = null;
   }
 }
-document.querySelector('#check-delivery').addEventListener('click', checkDeliveryAvailability);
 deliveryPostcode.addEventListener('blur', () => {
   if (!checkoutDelivery.hidden && deliveryPostcode.value.trim() && confirmedDeliveryFee === null) checkDeliveryAvailability();
 });
@@ -597,6 +914,30 @@ let checkingOffer = false;
 const checkoutSubmit = checkoutForm.querySelector('button[type="submit"]');
 const pendingKey = 'anise.pendingCashOrder';
 const pendingCardKey = 'anise.pendingCardOrder';
+const cardReturnKey = 'anise.cardReturnState';
+let returnedCardReference = null;
+async function stripeReturnState(requestId, expire = false) {
+  const response = await fetch(window.AnisePos.api + '/api/website/stripe-return', {
+    method:'POST', credentials:'omit', cache:'no-store', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({requestId, expire}), signal:AbortSignal.timeout(12000)
+  });
+  if (!response.ok) throw new Error('We could not confirm your payment status. Please try again or check your order status.');
+  return (await response.json()).state;
+}
+function returnedOrderChanged() {
+  let original;
+  try { original = JSON.parse(sessionStorage.getItem(pendingCardKey) || 'null')?.data; } catch (_) {}
+  if (!original) return true;
+  const currentLines = [...selected.values()].map(item => ({variantId:item.variantId, quantity:item.quantity,
+    modifierIds:item.modifiers.map(modifier => modifier.id), notes:item.notes}));
+  return original.orderType !== (checkoutDelivery.hidden ? 'Collection' : 'Delivery') ||
+    original.name !== checkoutForm.elements.name.value.trim() || original.phone !== checkoutForm.elements.phone.value.trim() ||
+    original.email !== checkoutForm.elements.email.value.trim() ||
+    (original.addressLine1 || '') !== (checkoutDelivery.hidden ? '' : checkoutForm.elements.addressLine1.value.trim()) ||
+    (original.addressLine2 || '') !== (checkoutDelivery.hidden ? '' : checkoutForm.elements.addressLine2.value.trim()) ||
+    (original.postcode || '') !== (checkoutDelivery.hidden ? '' : checkoutForm.elements.postcode.value.trim()) ||
+    JSON.stringify(original.lines) !== JSON.stringify(currentLines);
+}
 let cardAvailable = false;
 fetch(window.AnisePos.api + '/api/website/card-availability', {method:'POST',credentials:'omit',signal:AbortSignal.timeout(12000)}).then(r => r.ok ? r.json() : {}).then(result => { cardAvailable = result.available === true; updateCheckoutPayment(); }).catch(() => {});
 const trackingKey = 'anise.currentOrderStatus';
@@ -644,11 +985,22 @@ function updateCheckoutPayment() {
   const cash = checkoutForm.elements.payment.value === 'cash';
   document.querySelector('#checkout-review-payment').textContent = cash ? 'Cash' : 'Card';
   checkoutSubmit.disabled = checkingOffer || (!cash && !cardAvailable);
-  checkoutSubmit.textContent = cash ? 'Place cash order' : 'Continue to card payment';
+  checkoutSubmit.textContent = cash ? 'Place order' : 'Pay securely';
   checkoutStatus.textContent = cash ? 'Your order will be sent to the restaurant for confirmation. Cash payment is due on collection or delivery.' : cardAvailable ? 'You will continue to Stripe’s secure checkout. Your order will be sent to the restaurant after payment is confirmed.' : 'Card payment is not available yet.';
 }
 checkoutForm.addEventListener('change', event => {
-  if (event.target.name === 'payment') { clearCheckoutError(); updateCheckoutPayment(); }
+  if (event.target.name === 'payment') {
+    clearCheckoutError(); updateCheckoutPayment();
+    if (returnedCardReference) {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(cardReturnKey) || 'null');
+        if (saved?.requestId === returnedCardReference) {
+          saved.payment = checkoutForm.elements.payment.value;
+          sessionStorage.setItem(cardReturnKey, JSON.stringify(saved));
+        }
+      } catch (_) { /* The submit path will block if the return state is unavailable. */ }
+    }
+  }
 });
 checkoutForm.addEventListener('input', () => {
   if (!reviewedOffer) return;
@@ -662,17 +1014,42 @@ checkoutForm.addEventListener('input', () => {
 });
 checkoutForm.addEventListener('submit', async event => {
   event.preventDefault();
+  if (!document.body.classList.contains('payment-active')) return;
   if (location.protocol !== 'https:') { showCheckoutError('Please open the secure website before placing your order.'); return; }
   if (checkingOffer) return;
   clearCheckoutError();
+  if (returnedCardReference) {
+    checkingOffer = true;
+    checkoutSubmit.disabled = true;
+    checkoutStatus.textContent = 'Confirming the previous payment status…';
+    let returnError = null;
+    try {
+      const cash = checkoutForm.elements.payment.value === 'cash';
+      const state = await stripeReturnState(returnedCardReference, cash || returnedOrderChanged());
+      if (state === 'recorded') {
+        let pendingCard;
+        try { pendingCard = JSON.parse(sessionStorage.getItem(pendingCardKey) || 'null'); } catch (_) {}
+        if (pendingCard?.requestId === returnedCardReference) basketStorage.clearIfMatches(pendingCard.data.lines, pendingCard.data.orderType);
+        location.assign('order-status#' + encodeURIComponent(returnedCardReference)); return;
+      }
+      if (state === 'verifying') throw new Error('Your earlier card payment may be completing. Check its status before trying another payment.');
+      if (state === 'expired') {
+        sessionStorage.removeItem(pendingCardKey);
+        sessionStorage.removeItem(cardReturnKey);
+        returnedCardReference = null;
+      } else if (state !== 'open' || cash) throw new Error('We could not safely start another payment. Please check your order status.');
+    } catch (error) { returnError = error.message; }
+    finally { checkingOffer = false; updateCheckoutPayment(); }
+    if (returnError) { showCheckoutError(returnError); return; }
+  }
   const foodSubtotal = [...selected.values()].reduce((sum, item) => sum + item.quantity * item.price, 0);
   if (!checkoutDelivery.hidden && Math.round(foodSubtotal * 100) < 1800) { showCheckoutError('The minimum food subtotal for delivery is £18.00.'); return; }
   const validFields = checkoutFields.map(validateCheckoutField).every(Boolean);
-  if (!validFields) { showCheckoutError('Please correct the highlighted fields before continuing.', checkoutFields.find(input => input.getAttribute('aria-invalid') === 'true')); return; }
+  if (!validFields) { showDetails(); showCheckoutError('Please correct the highlighted fields before continuing.', checkoutFields.find(input => input.getAttribute('aria-invalid') === 'true')); return; }
   if (!checkoutForm.reportValidity()) return;
   if (!selected.size) { showCheckoutError('Your basket is empty. Add a dish before placing your order.'); return; }
   if (checkoutForm.elements.payment.value === 'card' && !cardAvailable) { showCheckoutError('Card payment is not available. Please choose another payment method.'); return; }
-  if (!checkoutDelivery.hidden && confirmedDeliveryFee === null) { showCheckoutError('Check delivery availability before placing your order.', deliveryPostcode); return; }
+  if (!checkoutDelivery.hidden && confirmedDeliveryFee === null) { showCheckoutError('Enter a valid delivery address and wait for availability to be confirmed.', deliveryPostcode); return; }
   if (deliveryRequiresApproval && !checkoutDelivery.hidden && !document.querySelector('#outside-radius-acknowledgement').checked) { showCheckoutError('Please confirm you understand we may decline this delivery order.'); document.querySelector('#outside-radius-acknowledgement').focus(); return; }
   const data = {
     outsideRadiusAcknowledged: !checkoutDelivery.hidden && deliveryRequiresApproval && document.querySelector('#outside-radius-acknowledgement').checked,
@@ -807,6 +1184,13 @@ checkoutForm.addEventListener('submit', async event => {
     if (isCard) {
       const url = new URL(result.url);
       if (url.protocol !== 'https:' || url.hostname !== 'checkout.stripe.com' || url.port || url.username || url.password) throw new Error('Unexpected checkout address');
+      try {
+        sessionStorage.setItem(cardReturnKey, JSON.stringify({requestId: pending.requestId, entries: [...selected], orderType: data.orderType,
+          deliveryFee: confirmedDeliveryFee, requiresApproval: deliveryRequiresApproval, outsideRadiusAcknowledged: document.querySelector('#outside-radius-acknowledgement').checked,
+          promo: appliedPromo, payment: checkoutForm.elements.payment.value,
+          offer: {hidden: document.querySelector('#offer-row').hidden, name: document.querySelector('#offer-name').textContent,
+            discount: document.querySelector('#offer-discount').textContent}}));
+      } catch (_) { showCheckoutError('Your browser cannot save your basket for a return from payment. Please try again with storage enabled.'); return; }
       location.assign(url.href); return;
     }
     if (!result.orderNumber) throw new Error('Missing order number');
@@ -818,6 +1202,7 @@ checkoutForm.addEventListener('submit', async event => {
       refreshOrderStatus();
     }
     sessionStorage.removeItem(pendingKey);
+    basketStorage.clearIfMatches(data.lines, data.orderType);
     selected.clear(); render();
     checkoutSubmit.disabled = true;
     location.assign('order-status#' + encodeURIComponent(pending.requestId));
@@ -826,3 +1211,91 @@ checkoutForm.addEventListener('submit', async event => {
     else showCheckoutError('We could not confirm your order. Retry without changing it, or call us on 020 7916 4976.');
   } finally { if (selected.size && (checkoutForm.elements.payment.value === 'cash' || cardAvailable)) checkoutSubmit.disabled = false; }
 });
+
+async function restoreStripeReturn() {
+  const requestId = new URLSearchParams(location.search).get('stripe_cancel');
+  if (!requestId) return;
+  const validReference = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId);
+  let pending, saved;
+  try {
+    pending = JSON.parse(sessionStorage.getItem(pendingCardKey) || 'null');
+    saved = JSON.parse(sessionStorage.getItem(cardReturnKey) || 'null');
+  } catch (_) { /* Missing browser storage is handled below. */ }
+  if (!validReference || pending?.requestId !== requestId || saved?.requestId !== requestId || !Array.isArray(saved.entries) || !pending.data) {
+    tracking.hidden = false;
+    showTracking('We could not restore this checkout. Check your order status before starting another payment.');
+    return;
+  }
+  let state;
+  try { state = await stripeReturnState(requestId); }
+  catch (_) {
+    tracking.hidden = false;
+    showTracking('We could not confirm your payment status. Please refresh this page before trying again.');
+    return;
+  }
+  if (state === 'recorded') {
+    basketStorage.clearIfMatches(pending.data.lines, pending.data.orderType);
+    location.assign('order-status#' + encodeURIComponent(requestId)); return;
+  }
+  if (!['open', 'verifying', 'expired'].includes(state)) return;
+  const lines = saved.entries.map(entry => entry?.[1]);
+  if (lines.length < 1 || lines.length > 50 || lines.some(item => !item || !Number.isInteger(item.quantity) || item.quantity < 1 || !Array.isArray(item.modifiers)) ||
+      JSON.stringify(lines.map(item => ({variantId:item.variantId, quantity:item.quantity, modifierIds:item.modifiers.map(modifier => modifier.id), notes:item.notes}))) !== JSON.stringify(pending.data.lines)) {
+    tracking.hidden = false;
+    showTracking('The saved basket could not be restored. Check your order status before starting another payment.');
+    return;
+  }
+  if (!menuCategories) {
+    tracking.hidden = false;
+    showTracking('The current menu is unavailable. Please refresh before resuming checkout.');
+    return;
+  }
+  const restored = basketStorage.resolve({items:lines.map(item => ({productId:item.productId, variantId:item.variantId,
+    modifierIds:item.modifiers.map(modifier => modifier.id), notes:item.notes, quantity:item.quantity, unitPrice:item.price}))}, menuCategories);
+  if (restored.entries.size !== lines.length) {
+    tracking.hidden = false;
+    showTracking('An item in your saved order is no longer available. Please review your basket and check your order status before trying again.');
+    return;
+  }
+  selected.clear();
+  restored.entries.forEach((item, key) => selected.set(key, item));
+  notifyBasket(restored.notices.join(' '));
+  document.querySelectorAll('.fulfilment button').forEach(button => {
+    const active = button.textContent.trim() === pending.data.orderType;
+    button.classList.toggle('selected', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  for (const [name, value] of Object.entries({name:pending.data.name, phone:pending.data.phone, email:pending.data.email,
+    addressLine1:pending.data.addressLine1, addressLine2:pending.data.addressLine2, postcode:pending.data.postcode}))
+    checkoutForm.elements[name].value = value || '';
+  checkoutForm.elements.payment.value = saved.payment === 'cash' ? 'cash' : 'card';
+  appliedPromo = saved.promo || null;
+  render();
+  openDetails();
+  confirmedDeliveryFee = pending.data.orderType === 'Delivery' ? saved.deliveryFee : null;
+  deliveryRequiresApproval = pending.data.orderType === 'Delivery' && saved.requiresApproval === true;
+  outsideRadiusWarning.hidden = !deliveryRequiresApproval;
+  document.querySelector('#outside-radius-acknowledgement').checked = saved.outsideRadiusAcknowledged === true;
+  deliveryFeeRow.hidden = confirmedDeliveryFee === null;
+  if (confirmedDeliveryFee !== null) document.querySelector('#delivery-fee').textContent = money(confirmedDeliveryFee);
+  refreshDetailsSummary();
+  if (Number.isFinite(pending.data.expectedTotal)) document.querySelector('#checkout-total').textContent = money(pending.data.expectedTotal);
+  document.querySelector('#checkout-review-total').textContent = document.querySelector('#checkout-total').textContent;
+  if (saved.offer) {
+    document.querySelector('#offer-row').hidden = saved.offer.hidden !== false;
+    document.querySelector('#offer-name').textContent = saved.offer.name || 'Offer';
+    document.querySelector('#offer-discount').textContent = saved.offer.discount || '';
+    if (!document.querySelector('#offer-row').hidden) document.querySelector('#promo-discount-row').hidden = true;
+  }
+  const reviewNote = document.querySelector('#checkout-review-note');
+  reviewNote.hidden = !deliveryRequiresApproval;
+  reviewNote.textContent = deliveryRequiresApproval ? 'This address is outside our normal delivery radius. Anise will review your order and may decline it.' : '';
+  showPayment();
+  returnedCardReference = requestId;
+  paymentReturnMessage.hidden = false;
+  paymentReturnMessage.textContent = state === 'verifying'
+    ? 'Your payment may still be processing. Check your order status before trying again.'
+    : 'Payment wasn’t completed. You can retry your card or choose cash; we’ll check the earlier payment first.';
+}
+menuLoad.then(restoreStripeReturn);
+if (location.hash === '#basket' && !new URLSearchParams(location.search).has('stripe_cancel')) showBasket(false);

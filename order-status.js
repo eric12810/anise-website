@@ -3,97 +3,40 @@ const statusText = document.querySelector('#status');
 const orderHeading = document.querySelector('#order-heading');
 const refreshButton = document.querySelector('#refresh');
 const animationFigure = document.querySelector('#status-animation');
-const animationVideos = [...document.querySelectorAll('.status-animation video')];
-let animationVideo = animationVideos[0];
+const animationVideo = document.querySelector('#status-video');
 const motionButton = document.querySelector('#motion-toggle');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-const fadeDuration = 450;
 let animationKey = '';
 let animationClips = [];
 let animationIndex = 0;
 let motionPaused = reducedMotion.matches;
-let transitionPending = false;
-let transitionVersion = 0;
-let fadeTimer;
+let clipVersion = 0;
 function updateMotionButton() {
   const label = motionPaused ? 'Play animation' : 'Pause animation';
   motionButton.setAttribute('aria-label', label);
   motionButton.title = label;
   motionButton.dataset.paused = String(motionPaused);
 }
-function loadClip(video, clip) {
-  if (video.dataset.clip === clip) return;
-  video.muted = true;
-  video.defaultMuted = true;
-  video.playsInline = true;
-  video.dataset.clip = clip;
-  video.poster = `public/videos/order-status/${clip}.jpg`;
-  video.src = `public/videos/order-status/${clip}.mp4`;
-  video.load();
-}
-function prepareNextClip() {
-  if (motionPaused || animationClips.length < 2) return;
-  const next = animationVideos.find(video => video !== animationVideo);
-  loadClip(next, animationClips[(animationIndex + 1) % animationClips.length]);
-  next.currentTime = 0;
-}
-function stopTransition() {
-  transitionVersion++;
-  clearTimeout(fadeTimer);
-  transitionPending = false;
-  animationVideos.forEach(video => {
-    video.pause();
-    video.loop = false;
-    video.classList.toggle('is-active', video === animationVideo);
-  });
-}
-async function playAnimationClip(index = animationIndex) {
+function showClip(index) {
   const clip = animationClips[index];
-  if (!clip || transitionPending) return;
+  if (!clip) return;
+  const version = ++clipVersion;
+  animationIndex = index;
+  animationVideo.pause();
+  animationVideo.poster = `public/videos/order-status/${clip}.jpg`;
   if (motionPaused) {
-    animationVideo.poster = `public/videos/order-status/${clip}.jpg`;
     animationVideo.removeAttribute('src');
-    delete animationVideo.dataset.clip;
-    animationVideo.load();
-    updateMotionButton();
-    return;
+  } else {
+    animationVideo.src = `public/videos/order-status/${clip}.mp4`;
   }
-  transitionPending = true;
-  const version = ++transitionVersion;
-  const outgoing = animationVideo;
-  // A repeated clip stays in one player, avoiding alternating rendering layers.
-  const incoming = outgoing.dataset.clip === clip
-    ? outgoing : animationVideos.find(video => video !== outgoing);
-  loadClip(incoming, clip);
-  incoming.loop = animationClips.length === 1;
-  if (incoming !== outgoing) incoming.currentTime = 0;
-  try {
-    // Keep the outgoing frame visible until the next video can play.
-    await incoming.play();
-    if (version !== transitionVersion) return;
-    animationIndex = index;
-    animationVideo = incoming;
-    incoming.classList.add('is-active');
-    if (incoming === outgoing) {
-      transitionPending = false;
-      prepareNextClip();
-      updateMotionButton();
-      return;
-    }
-    outgoing.classList.remove('is-active');
-    fadeTimer = setTimeout(() => {
-      outgoing.pause();
-      transitionPending = false;
-      prepareNextClip();
-    }, fadeDuration);
-  } catch (_) {
-    if (version !== transitionVersion) return;
-    transitionPending = false;
+  animationVideo.load();
+  animationVideo.loop = !motionPaused && animationClips.length === 1;
+  if (!motionPaused) animationVideo.play().catch(() => {
+    if (version !== clipVersion) return;
     motionPaused = true;
-    outgoing.poster = `public/videos/order-status/${clip}.jpg`;
-    animationVideos.forEach(video => video.pause());
+    animationVideo.pause();
     updateMotionButton();
-  }
+  });
   updateMotionButton();
 }
 function showOrderAnimation(order) {
@@ -106,35 +49,27 @@ function showOrderAnimation(order) {
   }[order.status] || [];
   const key = clips.join(',');
   if (key === animationKey) return;
-  stopTransition();
   animationKey = key;
   animationClips = clips;
-  animationIndex = 0;
   animationFigure.hidden = !clips.length;
-  if (clips.length) playAnimationClip();
-  else animationVideos.forEach(video => { video.removeAttribute('src'); delete video.dataset.clip; video.load(); });
+  if (clips.length) showClip(0);
+  else {
+    clipVersion++;
+    animationVideo.pause();
+    animationVideo.removeAttribute('src');
+    animationVideo.load();
+  }
 }
-animationVideos.forEach(video => {
-  const advance = () => {
-    if (video !== animationVideo || motionPaused || transitionPending || animationClips.length < 2) return;
-    playAnimationClip((animationIndex + 1) % animationClips.length);
-  };
-  video.addEventListener('timeupdate', () => {
-    if (video.duration - video.currentTime <= fadeDuration / 1000) advance();
-  });
-  video.addEventListener('ended', advance);
+animationVideo.addEventListener('ended', () => {
+  if (!motionPaused && animationClips.length > 1) showClip((animationIndex + 1) % animationClips.length);
 });
 motionButton.addEventListener('click', () => {
-  stopTransition();
   motionPaused = !motionPaused;
-  if (!motionPaused) playAnimationClip();
-  updateMotionButton();
+  showClip(animationIndex);
 });
 reducedMotion.addEventListener('change', event => {
-  stopTransition();
   motionPaused = event.matches;
-  if (!motionPaused) playAnimationClip();
-  updateMotionButton();
+  showClip(animationIndex);
 });
 const tokenPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function trackingToken() {
@@ -174,7 +109,14 @@ async function refresh() {
     const order = await response.json();
     showOrderAnimation(order);
     if (!['Cancelled','Refunded'].includes(order.status)) window.AnisePromotionCookie.markReturning();
-    try { const pending = JSON.parse(sessionStorage.getItem('anise.pendingCardOrder') || 'null'); if (pending?.requestId === token) sessionStorage.removeItem('anise.pendingCardOrder'); } catch (_) {}
+    try {
+      const pending = JSON.parse(sessionStorage.getItem('anise.pendingCardOrder') || 'null');
+      if (pending?.requestId === token) {
+        if (!['Cancelled','Refunded'].includes(order.status))
+          window.AniseBasketStorage?.clearIfMatches(pending.data.lines, pending.data.orderType);
+        sessionStorage.removeItem('anise.pendingCardOrder');
+      }
+    } catch (_) {}
     orderHeading.textContent = order.orderNumber == null ? 'Your order' : `Your order #${order.orderNumber}`;
     const delivery = order.orderType === 'Delivery';
     const messages = {
