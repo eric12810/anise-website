@@ -15,6 +15,35 @@ const quantityInput = document.querySelector('#dish-quantity');
 const notesInput = document.querySelector('#dish-notes');
 const options = document.querySelector('#dish-options');
 const selected = new Map();
+const basketStorage = window.AniseBasketStorage;
+let menuCategories = null;
+let basketReady = false;
+let basketRevision = 0;
+const basketNotice = document.createElement('p');
+basketNotice.className = 'basket-restore-notice';
+basketNotice.setAttribute('role', 'status');
+document.querySelector('#basket-page .basket-page-header').append(basketNotice);
+const menuBasketNotice = basketNotice.cloneNode();
+document.querySelector('#menu-status').after(menuBasketNotice);
+function notifyBasket(message) { basketNotice.textContent = message; menuBasketNotice.textContent = message; }
+function orderType() { return document.querySelector('.fulfilment button.selected').textContent.trim(); }
+function saveBasket() {
+  if (!basketReady) return;
+  basketStorage.write([...selected.values()], orderType());
+}
+function restoreBasket(saved, categories) {
+  const {entries, notices} = basketStorage.resolve(saved, categories);
+  selected.clear();
+  entries.forEach((item, key) => selected.set(key, item));
+  document.querySelectorAll('.fulfilment button').forEach(button => {
+    const active = button.textContent.trim() === (saved?.orderType || 'Collection');
+    button.classList.toggle('selected', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  notifyBasket([...new Set(notices)].join(' '));
+  confirmedDeliveryFee = null;
+  render();
+}
 let confirmedDeliveryFee = null;
 const money = value => new Intl.NumberFormat('en-GB', {style: 'currency', currency: 'GBP'}).format(value);
 let currentDish;
@@ -224,6 +253,7 @@ async function loadMenu() {
       categories = await response.json();
     }
     if (!Array.isArray(categories)) throw new Error('Invalid menu');
+    menuCategories = categories;
     let displayed = 0;
     categories.forEach((category, index) => {
       if (!Array.isArray(category.products)) return;
@@ -277,6 +307,12 @@ async function loadMenu() {
     });
     status.textContent = displayed ? '' : 'There are no dishes available right now. Please call us for the current menu.';
     updateDishPrices();
+    const saved = basketStorage.read();
+    if (saved && basketRevision === 0 && !new URLSearchParams(location.search).has('stripe_cancel')) restoreBasket(saved, categories);
+    basketReady = true;
+    render();
+    if (saved && basketRevision === 0 && !new URLSearchParams(location.search).has('stripe_cancel'))
+      basketStorage.write([...selected.values()], orderType(), saved.expiresAt);
   } catch (_) {
     status.textContent = 'The menu is temporarily unavailable. Please call us on 020 7916 4976 for the current menu.';
   }
@@ -338,12 +374,14 @@ form.addEventListener('submit', event => {
   const key = JSON.stringify([variant.id, modifiers.map(m => m.id).sort(), notes]);
   const entry = selected.get(key) || {variantId: variant.id, productId: currentDish.id, displayedDiscount: itemDiscounts.get(currentDish.id) ? {...itemDiscounts.get(currentDish.id), orderType: document.querySelector('.fulfilment button.selected').textContent.trim()} : null, name: currentDish.name, variant: variant.name, notes, modifiers, price: variant.price + modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0), quantity: 0};
   entry.quantity += Number(quantityInput.value); selected.set(key, entry); render(); dialog.close();
+  basketRevision++; saveBasket();
 });
 
 dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
 function change(key, amount) {
   const entry = selected.get(key); if (!entry) return;
   entry.quantity += amount; if (entry.quantity <= 0) selected.delete(key); render();
+  basketRevision++; saveBasket();
 }
 let deliveryMinimumAttempted = false;
 function render() {
@@ -379,7 +417,7 @@ function render() {
     const plus = element('button', '+'); plus.type = 'button'; plus.setAttribute('aria-label', `Add one ${item.name}`); plus.addEventListener('click', () => change(key, 1));
     const remove = element('button', 'Remove', 'basket-remove'); remove.type = 'button';
     remove.setAttribute('aria-label', `Remove ${item.name}`);
-    remove.addEventListener('click', () => { selected.delete(key); render(); });
+    remove.addEventListener('click', () => { selected.delete(key); basketRevision++; render(); saveBasket(); });
     controls.append(minus, element('span', item.quantity), plus);
     row.append(details, controls, remove); basket.append(row);
   });
@@ -389,6 +427,7 @@ document.querySelectorAll('.fulfilment button').forEach(button => button.addEven
   document.querySelectorAll('.fulfilment button').forEach(other => { other.classList.toggle('selected', other === button); other.setAttribute('aria-pressed', String(other === button)); });
   clearDeliveryQuote();
   render();
+  basketRevision++; saveBasket();
   refreshItemDiscounts();
 }));
 const basketPage = document.querySelector('#basket-page');
@@ -412,7 +451,13 @@ function showMenu(updateHistory = true) {
 }
 document.querySelector('.basket-trigger').addEventListener('click', () => showBasket());
 document.querySelector('#continue-browsing').addEventListener('click', event => { event.preventDefault(); showMenu(); });
-loadMenu();
+const menuLoad = loadMenu();
+window.addEventListener('storage', event => {
+  if (event.key !== basketStorage.key || !menuCategories) return;
+  const saved = basketStorage.read();
+  restoreBasket(saved, menuCategories);
+  basketReady = true;
+});
 refreshItemDiscounts();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshItemDiscounts(); });
 setInterval(() => { if (!document.hidden) refreshItemDiscounts(); }, 60000);
@@ -981,7 +1026,12 @@ checkoutForm.addEventListener('submit', async event => {
     try {
       const cash = checkoutForm.elements.payment.value === 'cash';
       const state = await stripeReturnState(returnedCardReference, cash || returnedOrderChanged());
-      if (state === 'recorded') { location.assign('order-status#' + encodeURIComponent(returnedCardReference)); return; }
+      if (state === 'recorded') {
+        let pendingCard;
+        try { pendingCard = JSON.parse(sessionStorage.getItem(pendingCardKey) || 'null'); } catch (_) {}
+        if (pendingCard?.requestId === returnedCardReference) basketStorage.clearIfMatches(pendingCard.data.lines, pendingCard.data.orderType);
+        location.assign('order-status#' + encodeURIComponent(returnedCardReference)); return;
+      }
       if (state === 'verifying') throw new Error('Your earlier card payment may be completing. Check its status before trying another payment.');
       if (state === 'expired') {
         sessionStorage.removeItem(pendingCardKey);
@@ -1152,6 +1202,7 @@ checkoutForm.addEventListener('submit', async event => {
       refreshOrderStatus();
     }
     sessionStorage.removeItem(pendingKey);
+    basketStorage.clearIfMatches(data.lines, data.orderType);
     selected.clear(); render();
     checkoutSubmit.disabled = true;
     location.assign('order-status#' + encodeURIComponent(pending.requestId));
@@ -1182,7 +1233,10 @@ async function restoreStripeReturn() {
     showTracking('We could not confirm your payment status. Please refresh this page before trying again.');
     return;
   }
-  if (state === 'recorded') { location.assign('order-status#' + encodeURIComponent(requestId)); return; }
+  if (state === 'recorded') {
+    basketStorage.clearIfMatches(pending.data.lines, pending.data.orderType);
+    location.assign('order-status#' + encodeURIComponent(requestId)); return;
+  }
   if (!['open', 'verifying', 'expired'].includes(state)) return;
   const lines = saved.entries.map(entry => entry?.[1]);
   if (lines.length < 1 || lines.length > 50 || lines.some(item => !item || !Number.isInteger(item.quantity) || item.quantity < 1 || !Array.isArray(item.modifiers)) ||
@@ -1191,8 +1245,21 @@ async function restoreStripeReturn() {
     showTracking('The saved basket could not be restored. Check your order status before starting another payment.');
     return;
   }
+  if (!menuCategories) {
+    tracking.hidden = false;
+    showTracking('The current menu is unavailable. Please refresh before resuming checkout.');
+    return;
+  }
+  const restored = basketStorage.resolve({items:lines.map(item => ({productId:item.productId, variantId:item.variantId,
+    modifierIds:item.modifiers.map(modifier => modifier.id), notes:item.notes, quantity:item.quantity, unitPrice:item.price}))}, menuCategories);
+  if (restored.entries.size !== lines.length) {
+    tracking.hidden = false;
+    showTracking('An item in your saved order is no longer available. Please review your basket and check your order status before trying again.');
+    return;
+  }
   selected.clear();
-  saved.entries.forEach(([key, item]) => selected.set(key, item));
+  restored.entries.forEach((item, key) => selected.set(key, item));
+  notifyBasket(restored.notices.join(' '));
   document.querySelectorAll('.fulfilment button').forEach(button => {
     const active = button.textContent.trim() === pending.data.orderType;
     button.classList.toggle('selected', active);
@@ -1230,5 +1297,5 @@ async function restoreStripeReturn() {
     ? 'Your payment may still be processing. Check your order status before trying again.'
     : 'Payment wasn’t completed. You can retry your card or choose cash; we’ll check the earlier payment first.';
 }
-restoreStripeReturn();
+menuLoad.then(restoreStripeReturn);
 if (location.hash === '#basket' && !new URLSearchParams(location.search).has('stripe_cancel')) showBasket(false);

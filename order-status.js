@@ -109,7 +109,14 @@ async function refresh() {
     const order = await response.json();
     showOrderAnimation(order);
     if (!['Cancelled','Refunded'].includes(order.status)) window.AnisePromotionCookie.markReturning();
-    try { const pending = JSON.parse(sessionStorage.getItem('anise.pendingCardOrder') || 'null'); if (pending?.requestId === token) sessionStorage.removeItem('anise.pendingCardOrder'); } catch (_) {}
+    try {
+      const pending = JSON.parse(sessionStorage.getItem('anise.pendingCardOrder') || 'null');
+      if (pending?.requestId === token) {
+        if (!['Cancelled','Refunded'].includes(order.status))
+          window.AniseBasketStorage?.clearIfMatches(pending.data.lines, pending.data.orderType);
+        sessionStorage.removeItem('anise.pendingCardOrder');
+      }
+    } catch (_) {}
     orderHeading.textContent = order.orderNumber == null ? 'Your order' : `Your order #${order.orderNumber}`;
     const delivery = order.orderType === 'Delivery';
     const messages = {
