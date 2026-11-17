@@ -15,6 +15,7 @@ const quantityInput = document.querySelector('#dish-quantity');
 const notesInput = document.querySelector('#dish-notes');
 const options = document.querySelector('#dish-options');
 const selected = new Map();
+let confirmedDeliveryFee = null;
 const money = value => new Intl.NumberFormat('en-GB', {style: 'currency', currency: 'GBP'}).format(value);
 let currentDish;
 let dishScrollLock = null;
@@ -359,6 +360,11 @@ function render() {
   document.querySelector('.basket-trigger-count').textContent = `(${total})`;
   document.querySelector('.basket-trigger strong').textContent = money(subtotal);
   document.querySelector('#basket-subtotal').textContent = money(subtotal);
+  const basketFee = delivery ? confirmedDeliveryFee : null;
+  document.querySelector('#basket-delivery-fee-row').hidden = basketFee === null;
+  if (basketFee !== null) document.querySelector('#basket-delivery-fee').textContent = money(basketFee);
+  document.querySelector('#basket-total').textContent = money(subtotal + (basketFee || 0));
+  document.querySelector('#basket-charge-note').hidden = !delivery || basketFee !== null;
   if (document.querySelector('.checkout-dialog')?.open) refreshDetailsSummary();
   basket.replaceChildren();
   if (!total) { const empty = element('div', null, 'empty'); empty.innerHTML = '<span aria-hidden="true">✳</span><p>Your table awaits.</p><small>Add a dish to start your basket.</small>'; basket.append(empty); return; }
@@ -367,20 +373,45 @@ function render() {
     details.append(element('strong', item.name), element('p', `${item.variant} · ${money(item.price)} each`, 'basket-item-note'));
     if (item.modifiers.length) details.append(element('p', item.modifiers.map(m => m.name).join(', '), 'basket-item-note'));
     if (item.notes) details.append(element('p', `Note: ${item.notes}`, 'basket-item-note'));
+    details.append(element('span', money(item.price * item.quantity), 'basket-line-total'));
     const controls = element('div', null, 'quantity');
     const minus = element('button', '−'); minus.type = 'button'; minus.setAttribute('aria-label', `Remove one ${item.name}`); minus.addEventListener('click', () => change(key, -1));
     const plus = element('button', '+'); plus.type = 'button'; plus.setAttribute('aria-label', `Add one ${item.name}`); plus.addEventListener('click', () => change(key, 1));
-    controls.append(minus, element('span', item.quantity), plus); row.append(details, controls); basket.append(row);
+    const remove = element('button', 'Remove', 'basket-remove'); remove.type = 'button';
+    remove.setAttribute('aria-label', `Remove ${item.name}`);
+    remove.addEventListener('click', () => { selected.delete(key); render(); });
+    controls.append(minus, element('span', item.quantity), plus);
+    row.append(details, controls, remove); basket.append(row);
   });
 }
 document.querySelectorAll('.fulfilment button').forEach(button => button.addEventListener('click', () => {
+  if (button.classList.contains('selected')) return;
   document.querySelectorAll('.fulfilment button').forEach(other => { other.classList.toggle('selected', other === button); other.setAttribute('aria-pressed', String(other === button)); });
+  clearDeliveryQuote();
   render();
   refreshItemDiscounts();
 }));
-const basketDialog = document.querySelector('.basket-dialog');
-document.querySelector('.basket-trigger').addEventListener('click', () => basketDialog.showModal());
-basketDialog.addEventListener('click', event => { if (event.target === basketDialog) basketDialog.close(); });
+const basketPage = document.querySelector('#basket-page');
+function showBasket(updateHistory = true) {
+  if (checkoutDialog.open) checkoutDialog.close();
+  basketPage.hidden = false;
+  document.body.classList.remove('details-active', 'payment-active');
+  document.body.classList.add('basket-active');
+  render();
+  if (updateHistory) history.pushState({aniseBasket:true}, '', '#basket');
+  window.scrollTo(0, 0);
+  document.querySelector('#basket-title').focus();
+}
+function showMenu(updateHistory = true) {
+  if (checkoutDialog.open) checkoutDialog.close();
+  basketPage.hidden = true;
+  document.body.classList.remove('basket-active', 'details-active', 'payment-active');
+  if (updateHistory) history.pushState(null, '', location.pathname + location.search);
+  window.scrollTo(0, 0);
+  document.querySelector('.basket-trigger').focus();
+}
+document.querySelector('.basket-trigger').addEventListener('click', () => showBasket());
+document.querySelector('#continue-browsing').addEventListener('click', event => { event.preventDefault(); showMenu(); });
 loadMenu();
 refreshItemDiscounts();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshItemDiscounts(); });
@@ -535,6 +566,8 @@ function refreshDetailsSummary() {
   subtotalRow.replaceChildren(element('span', 'Subtotal'), element('strong', money(subtotal)));
   showPromo(subtotal);
   document.querySelector('#checkout-total').textContent = money(promoTotal(subtotal, checkoutDelivery.hidden ? 0 : (confirmedDeliveryFee || 0)));
+  document.querySelector('#checkout-review-total').textContent = !checkoutDelivery.hidden && confirmedDeliveryFee === null
+    ? 'Delivery check required' : document.querySelector('#checkout-total').textContent;
 }
 let detailsOrderType = null;
 function setDetailsOrderType() {
@@ -552,8 +585,9 @@ function setDetailsOrderType() {
   if (delivery) scheduleDeliveryCheck();
 }
 function openDetails() {
-  basketDialog.close();
+  basketPage.hidden = true;
   checkoutDialog.show();
+  document.body.classList.remove('basket-active');
   document.body.classList.add('details-active');
   document.body.classList.remove('payment-active');
   setDetailsOrderType();
@@ -566,9 +600,8 @@ function openDetails() {
 }
 function closeDetails(openBasket = false) {
   checkoutDialog.close();
-  document.body.classList.remove('details-active', 'payment-active');
-  if (location.hash === '#details' || location.hash === '#payment') history.replaceState(null, '', location.pathname + location.search);
-  if (openBasket) basketDialog.showModal();
+  if (openBasket) showBasket();
+  else showMenu();
 }
 function showDetails(updateHistory = true) {
   document.body.classList.remove('payment-active');
@@ -579,7 +612,7 @@ function showDetails(updateHistory = true) {
   if (updateHistory) history.replaceState({aniseDetails:true}, '', '#details');
   detailsTitle.focus();
 }
-function showPayment() {
+function showPayment(updateHistory = true) {
   const address = [checkoutForm.elements.addressLine1.value.trim(), checkoutForm.elements.addressLine2.value.trim(), checkoutForm.elements.postcode.value.trim()].filter(Boolean).join(', ');
   const customerRow = (label, value) => {
     const row = element('div', null, 'payment-customer-row');
@@ -596,7 +629,7 @@ function showPayment() {
   checkoutDialog.setAttribute('aria-labelledby', 'payment-page-title');
   refreshDetailsSummary();
   updateCheckoutPayment();
-  history.pushState({anisePayment:true}, '', '#payment');
+  if (updateHistory) history.pushState({anisePayment:true}, '', '#payment');
   window.scrollTo(0, 0);
   paymentTitle.setAttribute('tabindex', '-1');
   paymentTitle.focus();
@@ -605,7 +638,18 @@ backToBasket.addEventListener('click', () => closeDetails(true));
 editBasket.addEventListener('click', () => closeDetails(true));
 backToDetails.addEventListener('click', () => showDetails());
 editDetails.addEventListener('click', () => showDetails());
-window.addEventListener('popstate', () => { if (checkoutDialog.open) { if (document.body.classList.contains('payment-active')) showDetails(); else closeDetails(true); } });
+window.addEventListener('popstate', () => {
+  if (location.hash === '#basket') showBasket(false);
+  else if (location.hash === '#details' && selected.size) {
+    basketPage.hidden = true;
+    if (!checkoutDialog.open) checkoutDialog.show();
+    document.body.classList.remove('basket-active', 'payment-active');
+    document.body.classList.add('details-active');
+    setDetailsOrderType();
+    showDetails(false);
+  } else if (location.hash === '#payment' && checkoutDialog.open) showPayment(false);
+  else showMenu(false);
+});
 detailsAction.addEventListener('click', () => {
   detailsMessage.textContent = '';
   const subtotal = [...selected.values()].reduce((sum, item) => sum + item.quantity * item.price, 0);
@@ -724,7 +768,6 @@ const deliveryFeeRow = document.querySelector('#delivery-fee-row');
 const deliveryPostcode = document.querySelector('#checkout-postcode');
 let deliveryQuoteSequence = 0;
 let pendingDeliverySequence = null;
-let confirmedDeliveryFee = null;
 let deliveryRequiresApproval = false;
 function clearDeliveryQuote() {
   deliveryQuoteSequence++;
@@ -1188,3 +1231,4 @@ async function restoreStripeReturn() {
     : 'Payment wasn’t completed. You can retry your card or choose cash; we’ll check the earlier payment first.';
 }
 restoreStripeReturn();
+if (location.hash === '#basket' && !new URLSearchParams(location.search).has('stripe_cancel')) showBasket(false);
