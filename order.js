@@ -353,7 +353,7 @@ function render() {
   if (!delivery || Math.round(subtotal * 100) >= 1800) deliveryMinimumAttempted = false;
   document.querySelector('#fulfilment-note').classList.toggle('delivery-minimum-error', deliveryMinimumAttempted);
   document.querySelector('#fulfilment-note').textContent = delivery
-    ? (Math.round(subtotal * 100) < 1800 ? `Minimum food subtotal for delivery is £18.00. Add ${money((1800 - Math.round(subtotal * 100)) / 100)} more.` : 'Minimum food subtotal for delivery is £18.00. Delivery availability and charges are confirmed by postcode.')
+    ? (Math.round(subtotal * 100) < 1800 ? `Minimum food subtotal for delivery is £18.00. Add ${money((1800 - Math.round(subtotal * 100)) / 100)} more.` : '')
     : 'Collect your order from Anise in Camden.';
   document.querySelector('.basket-trigger-count').textContent = `(${total})`;
   document.querySelector('.basket-trigger strong').textContent = money(subtotal);
