@@ -30,6 +30,7 @@
 .details-main h1,.details-summary h3{font-family:var(--sans);font-size:24px;font-weight:400;line-height:1.2;letter-spacing:normal}
 .details-summary #checkout-fulfilment{margin:0 0 12px;color:#796d62;font:13px/1.5 var(--serif)}
 .details-summary .checkout-summary-row{font-size:14px}
+.details-summary .checkout-summary-row:last-child{border-bottom:0}
 .details-summary .checkout-total{margin:20px 0 0;padding-top:16px;border-top:1px solid #e3dbcf}
 .details-main #checkout-delivery:not([hidden]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px;row-gap:16px;margin-top:0}
 .details-main #delivery-result{grid-column:1/-1}
