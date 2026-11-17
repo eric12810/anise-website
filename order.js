@@ -451,7 +451,7 @@ const backToBasket = element('button', '← Back to basket', 'details-back');
 backToBasket.type = 'button';
 const detailsTitle = element('h1', 'A few details');
 detailsTitle.id = 'details-page-title';
-detailsHeader.append(backToBasket, detailsTitle);
+detailsHeader.append(backToBasket);
 const detailsProgressWrap = element('div', null, 'details-progress-wrap');
 detailsProgressWrap.append(detailsProgress);
 checkoutDialog.setAttribute('aria-labelledby', 'details-page-title');
@@ -482,6 +482,7 @@ for (const id of ['checkout-address-line1', 'checkout-address-line2', 'checkout-
   checkoutDelivery.insertBefore(detailsField(label, input, error), checkoutDelivery.querySelector('#check-delivery'));
 }
 detailsMain.append(detailsFields[6], document.querySelector('#outside-radius-warning'), detailsAction, detailsMessage);
+detailsMain.prepend(detailsTitle);
 detailsAside.append(document.querySelector('#checkout-summary'), document.querySelector('#delivery-fee-row'), document.querySelector('#promo-discount-row'), document.querySelector('#offer-row'), document.querySelector('#checkout-total').parentElement);
 detailsColumns.append(detailsMain, detailsAside);
 detailsForm.prepend(detailsHeader, detailsProgressWrap, detailsColumns);
