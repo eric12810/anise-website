@@ -479,7 +479,7 @@ for (const id of ['checkout-address-line1', 'checkout-address-line2', 'checkout-
   const input = document.getElementById(id);
   const label = checkoutDelivery.querySelector(`label[for="${id}"]`);
   const error = document.getElementById(id + '-error');
-  checkoutDelivery.insertBefore(detailsField(label, input, error), checkoutDelivery.querySelector('#check-delivery'));
+  checkoutDelivery.insertBefore(detailsField(label, input, error), checkoutDelivery.querySelector('#delivery-result'));
 }
 detailsMain.append(detailsFields[6], document.querySelector('#outside-radius-warning'), detailsAction, detailsMessage);
 detailsMain.prepend(detailsTitle);
@@ -545,7 +545,7 @@ detailsAction.addEventListener('click', () => {
   if (!checkoutDelivery.hidden && Math.round(subtotal * 100) < 1800) { detailsMessage.textContent = 'The minimum food subtotal for delivery is £18.00.'; return; }
   const valid = checkoutFields.map(validateCheckoutField).every(Boolean);
   if (!valid) { const field = checkoutFields.find(input => input.getAttribute('aria-invalid') === 'true'); field?.focus(); detailsMessage.textContent = 'Please correct the highlighted fields.'; return; }
-  if (!checkoutDelivery.hidden && confirmedDeliveryFee === null) { deliveryPostcode.focus(); detailsMessage.textContent = 'Check delivery availability before continuing.'; return; }
+  if (!checkoutDelivery.hidden && confirmedDeliveryFee === null) { deliveryPostcode.focus(); detailsMessage.textContent = 'Enter a valid delivery address and wait for availability to be confirmed.'; return; }
   if (deliveryRequiresApproval && !document.querySelector('#outside-radius-acknowledgement').checked) { document.querySelector('#outside-radius-acknowledgement').focus(); detailsMessage.textContent = 'Please acknowledge the delivery radius notice.'; return; }
   detailsMessage.textContent = 'Payment will be available in the next step.';
 });
@@ -689,8 +689,6 @@ async function checkDeliveryAvailability() {
   if (!validateCheckoutField(document.querySelector('#checkout-address-line1')) || !validateCheckoutField(deliveryPostcode)) return;
   const sequence = deliveryQuoteSequence;
   pendingDeliverySequence = sequence;
-  const button = document.querySelector('#check-delivery');
-  button.disabled = true;
   deliveryResult.textContent = 'Checking delivery availability…';
   try {
     const response = await fetch(window.AnisePos.api + '/api/website/delivery-quote', {
@@ -716,13 +714,9 @@ async function checkDeliveryAvailability() {
   } catch (_) {
     if (sequence === deliveryQuoteSequence && !checkoutDelivery.hidden) deliveryResult.textContent = 'Delivery availability is temporarily unavailable. Please try again later.';
   } finally {
-    if (pendingDeliverySequence === sequence) {
-      pendingDeliverySequence = null;
-      button.disabled = false;
-    }
+    if (pendingDeliverySequence === sequence) pendingDeliverySequence = null;
   }
 }
-document.querySelector('#check-delivery').addEventListener('click', checkDeliveryAvailability);
 deliveryPostcode.addEventListener('blur', () => {
   if (!checkoutDelivery.hidden && deliveryPostcode.value.trim() && confirmedDeliveryFee === null) checkDeliveryAvailability();
 });
@@ -835,7 +829,7 @@ checkoutForm.addEventListener('submit', async event => {
   if (!checkoutForm.reportValidity()) return;
   if (!selected.size) { showCheckoutError('Your basket is empty. Add a dish before placing your order.'); return; }
   if (checkoutForm.elements.payment.value === 'card' && !cardAvailable) { showCheckoutError('Card payment is not available. Please choose another payment method.'); return; }
-  if (!checkoutDelivery.hidden && confirmedDeliveryFee === null) { showCheckoutError('Check delivery availability before placing your order.', deliveryPostcode); return; }
+  if (!checkoutDelivery.hidden && confirmedDeliveryFee === null) { showCheckoutError('Enter a valid delivery address and wait for availability to be confirmed.', deliveryPostcode); return; }
   if (deliveryRequiresApproval && !checkoutDelivery.hidden && !document.querySelector('#outside-radius-acknowledgement').checked) { showCheckoutError('Please confirm you understand we may decline this delivery order.'); document.querySelector('#outside-radius-acknowledgement').focus(); return; }
   const data = {
     outsideRadiusAcknowledged: !checkoutDelivery.hidden && deliveryRequiresApproval && document.querySelector('#outside-radius-acknowledgement').checked,
