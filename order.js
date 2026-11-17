@@ -443,13 +443,15 @@ function showBasket(updateHistory = true) {
   window.scrollTo(0, 0);
   document.querySelector('#basket-title').focus();
 }
-function showMenu(updateHistory = true) {
+function showMenu(updateHistory = true, resetScroll = true) {
   if (checkoutDialog.open) checkoutDialog.close();
   basketPage.hidden = true;
   document.body.classList.remove('basket-active', 'details-active', 'payment-active');
   if (updateHistory) history.pushState(null, '', location.pathname + location.search);
-  window.scrollTo(0, 0);
-  document.querySelector('.basket-trigger').focus();
+  if (resetScroll) {
+    window.scrollTo(0, 0);
+    document.querySelector('.basket-trigger').focus();
+  }
 }
 document.querySelector('.basket-trigger').addEventListener('click', () => showBasket());
 document.querySelector('#continue-browsing').addEventListener('click', event => { event.preventDefault(); showMenu(); });
@@ -687,7 +689,8 @@ editBasket.addEventListener('click', () => closeDetails(true));
 backToDetails.addEventListener('click', () => showDetails());
 editDetails.addEventListener('click', () => showDetails());
 window.addEventListener('popstate', () => {
-  if (location.hash === '#basket') showBasket(false);
+  if (location.hash.startsWith('#order-category-') && document.getElementById(location.hash.slice(1))) showMenu(false, false);
+  else if (location.hash === '#basket') showBasket(false);
   else if (location.hash === '#details' && selected.size) {
     basketPage.hidden = true;
     if (!checkoutDialog.open) checkoutDialog.show();
