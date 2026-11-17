@@ -358,6 +358,7 @@ function render() {
   document.querySelector('.basket-trigger-count').textContent = `(${total})`;
   document.querySelector('.basket-trigger strong').textContent = money(subtotal);
   document.querySelector('#basket-subtotal').textContent = money(subtotal);
+  if (document.querySelector('.checkout-dialog')?.open) refreshDetailsSummary();
   basket.replaceChildren();
   if (!total) { const empty = element('div', null, 'empty'); empty.innerHTML = '<span aria-hidden="true">✳</span><p>Your table awaits.</p><small>Add a dish to start your basket.</small>'; basket.append(empty); return; }
   selected.forEach((item, key) => {
@@ -432,6 +433,113 @@ const checkoutDialog = document.querySelector('.checkout-dialog');
 const checkoutOpen = document.querySelector('#checkout-open');
 const checkoutForm = document.querySelector('#checkout-form');
 const checkoutDelivery = document.querySelector('#checkout-delivery');
+const detailsForm = checkoutForm;
+const detailsMain = element('div', null, 'details-main');
+const detailsAside = element('aside', null, 'details-summary');
+const detailsColumns = element('div', null, 'details-columns');
+const detailsProgress = document.querySelector('.checkout-progress').cloneNode(true);
+detailsProgress.querySelectorAll('li').forEach((step, index) => {
+  step.removeAttribute('aria-current');
+  step.setAttribute('aria-label', `Step ${index + 1} of 3: ${['Basket, completed', 'Details, current', 'Payment'][index]}`);
+  if (index === 0) step.classList.add('is-complete');
+  if (index === 1) step.setAttribute('aria-current', 'step');
+});
+checkoutDialog.classList.add('details-page');
+document.querySelector('main').append(checkoutDialog);
+const detailsHeader = element('div', null, 'details-header');
+const backToBasket = element('button', '← Back to basket', 'details-back');
+backToBasket.type = 'button';
+const detailsTitle = element('h1', 'Your details.');
+detailsTitle.id = 'details-page-title';
+detailsHeader.append(backToBasket, detailsProgress, detailsTitle);
+checkoutDialog.setAttribute('aria-labelledby', 'details-page-title');
+const detailsType = element('div', null, 'details-type');
+detailsType.setAttribute('aria-label', 'Order type');
+for (const type of ['Collection', 'Delivery']) {
+  const button = element('button', type); button.type = 'button';
+  button.addEventListener('click', () => {
+    const basketButton = [...document.querySelectorAll('.fulfilment button')].find(x => x.textContent.trim() === type);
+    basketButton.click();
+    setDetailsOrderType(true);
+  });
+  detailsType.append(button);
+}
+const detailsAction = element('button', 'Continue to payment  ›', 'details-continue');
+detailsAction.type = 'button';
+const detailsMessage = element('p', '', 'details-message');
+detailsMessage.setAttribute('role', 'status');
+const detailsSummaryTitle = element('h3', 'Your order');
+const editBasket = element('button', 'Edit basket', 'details-edit');
+editBasket.type = 'button';
+detailsAside.append(detailsSummaryTitle, editBasket);
+const detailsFields = ['checkout-name','checkout-name-error','checkout-phone','checkout-phone-error','checkout-email','checkout-email-error','checkout-delivery'].map(id => document.getElementById(id));
+const detailsLabels = ['checkout-name','checkout-phone','checkout-email'].map(id => detailsForm.querySelector(`label[for="${id}"]`));
+detailsMain.append(detailsType);
+for (let i = 0; i < 3; i++) detailsMain.append(detailsLabels[i], detailsFields[i * 2], detailsFields[i * 2 + 1]);
+detailsMain.append(detailsFields[6], document.querySelector('#outside-radius-warning'), detailsAction, detailsMessage);
+detailsAside.append(document.querySelector('#checkout-summary'), document.querySelector('#delivery-fee-row'), document.querySelector('#promo-discount-row'), document.querySelector('#offer-row'), document.querySelector('#checkout-total').parentElement);
+detailsColumns.append(detailsMain, detailsAside);
+detailsForm.prepend(detailsHeader, detailsColumns);
+function refreshDetailsSummary() {
+  if (!checkoutDialog.open) return;
+  const summary = document.querySelector('#checkout-summary');
+  summary.replaceChildren();
+  const subtotal = [...selected.values()].reduce((sum, item) => sum + item.price * item.quantity, 0);
+  selected.forEach(item => {
+    const row = element('div', null, 'checkout-summary-row');
+    const description = element('div');
+    description.append(element('strong', `${item.quantity} × ${item.name}`), element('small', [item.variant, ...item.modifiers.map(m => m.name)].join(' · ')));
+    if (item.notes) description.append(element('small', `Note: ${item.notes}`));
+    row.append(description, element('span', money(item.price * item.quantity)));
+    summary.append(row);
+  });
+  let subtotalRow = document.querySelector('#details-subtotal');
+  if (!subtotalRow) { subtotalRow = element('p', null, 'checkout-total'); subtotalRow.id = 'details-subtotal'; detailsAside.insertBefore(subtotalRow, document.querySelector('#delivery-fee-row')); }
+  subtotalRow.replaceChildren(element('span', 'Subtotal'), element('strong', money(subtotal)));
+  showPromo(subtotal);
+  document.querySelector('#checkout-total').textContent = money(promoTotal(subtotal, checkoutDelivery.hidden ? 0 : (confirmedDeliveryFee || 0)));
+}
+function setDetailsOrderType(resetQuote = false) {
+  const delivery = document.querySelector('.fulfilment button.selected').textContent.trim() === 'Delivery';
+  checkoutDelivery.hidden = !delivery;
+  checkoutDelivery.querySelector('#checkout-address-line1').required = delivery;
+  checkoutDelivery.querySelector('#checkout-postcode').required = delivery;
+  [...detailsType.children].forEach(button => { const active = button.textContent === (delivery ? 'Delivery' : 'Collection'); button.classList.toggle('selected', active); button.setAttribute('aria-pressed', String(active)); });
+  if (resetQuote) clearDeliveryQuote();
+  refreshDetailsSummary();
+  if (delivery) scheduleDeliveryCheck();
+}
+function openDetails() {
+  basketDialog.close();
+  checkoutDialog.show();
+  document.body.classList.add('details-active');
+  setDetailsOrderType();
+  refreshPotentialOffer();
+  history.pushState({aniseDetails: true}, '', '#details');
+  window.scrollTo(0, 0);
+  detailsTitle.setAttribute('tabindex', '-1');
+  detailsTitle.focus();
+}
+function closeDetails(openBasket = false) {
+  checkoutDialog.close();
+  document.body.classList.remove('details-active');
+  if (location.hash === '#details') history.replaceState(null, '', location.pathname + location.search);
+  if (openBasket) basketDialog.showModal();
+}
+backToBasket.addEventListener('click', () => closeDetails(true));
+editBasket.addEventListener('click', () => closeDetails(true));
+window.addEventListener('popstate', () => { if (checkoutDialog.open) closeDetails(true); });
+detailsAction.addEventListener('click', () => {
+  detailsMessage.textContent = '';
+  const subtotal = [...selected.values()].reduce((sum, item) => sum + item.quantity * item.price, 0);
+  if (!selected.size) { showCheckoutError('Your basket is empty.'); closeDetails(true); return; }
+  if (!checkoutDelivery.hidden && Math.round(subtotal * 100) < 1800) { detailsMessage.textContent = 'The minimum food subtotal for delivery is £18.00.'; return; }
+  const valid = checkoutFields.map(validateCheckoutField).every(Boolean);
+  if (!valid) { const field = checkoutFields.find(input => input.getAttribute('aria-invalid') === 'true'); field?.focus(); detailsMessage.textContent = 'Please correct the highlighted fields.'; return; }
+  if (!checkoutDelivery.hidden && confirmedDeliveryFee === null) { deliveryPostcode.focus(); detailsMessage.textContent = 'Check delivery availability before continuing.'; return; }
+  if (deliveryRequiresApproval && !document.querySelector('#outside-radius-acknowledgement').checked) { document.querySelector('#outside-radius-acknowledgement').focus(); detailsMessage.textContent = 'Please acknowledge the delivery radius notice.'; return; }
+  detailsMessage.textContent = 'Payment will be available in the next step.';
+});
 let potentialSaving = 0, potentialOffer = null, potentialSequence = 0, acceptedOfferSignature = null;
 function selectedItemPotential() {
   const groups = new Map();
@@ -503,35 +611,7 @@ checkoutOpen.addEventListener('click', () => {
     note.focus();
     return;
   }
-  clearCheckoutError();
-  reviewedOffer = null; document.querySelector('#offer-row').hidden = true;
-  const delivery = document.querySelector('.fulfilment button.selected').textContent.trim() === 'Delivery';
-  checkoutDelivery.hidden = !delivery;
-  clearDeliveryQuote();
-  checkoutDelivery.querySelectorAll('input').forEach(input => { input.setCustomValidity(''); input.removeAttribute('aria-invalid'); document.getElementById(input.id + '-error').textContent = ''; });
-  document.querySelector('#checkout-fulfilment').textContent = delivery
-    ? 'Delivery · Check your postcode for availability and charge.' : 'Collection · 1 Kent House, Ferdinand Street, London NW1 8ET.';
-  const summary = document.querySelector('#checkout-summary');
-  summary.replaceChildren();
-  let subtotal = 0;
-  selected.forEach(item => {
-    subtotal += item.price * item.quantity;
-    const row = element('div', null, 'checkout-summary-row');
-    const description = element('div');
-    description.append(element('strong', `${item.quantity} × ${item.name}`), element('small', [item.variant, ...item.modifiers.map(m => m.name)].join(' · ')));
-    if (item.notes) description.append(element('small', `Note: ${item.notes}`));
-    row.append(description, element('span', money(item.price * item.quantity)));
-    summary.append(row);
-  });
-  showPromo(subtotal);
-  document.querySelector('#checkout-total').textContent = money(promoTotal(subtotal));
-  document.querySelector('#checkout-review-total').textContent = delivery ? 'Delivery check required' : money(promoTotal(subtotal));
-  document.querySelector('#checkout-review-note').textContent = delivery ? 'Check your postcode to confirm the delivery fee and total.' : 'Prices will be confirmed before your order is placed.';
-  checkoutDelivery.querySelector('#checkout-address-line1').required = delivery;
-  checkoutDelivery.querySelector('#checkout-postcode').required = delivery;
-  basketDialog.close();
-  checkoutDialog.showModal();
-  refreshPotentialOffer();
+  openDetails();
 });
 checkoutDialog.addEventListener('click', event => { if (event.target === checkoutDialog) checkoutDialog.close(); });
 const checkoutFields = ['checkout-name', 'checkout-phone', 'checkout-email', 'checkout-address-line1', 'checkout-address-line2', 'checkout-postcode'].map(id => document.getElementById(id));
@@ -583,10 +663,21 @@ function clearDeliveryQuote() {
   document.querySelector('#checkout-review-note').textContent = checkoutDelivery.hidden ? 'Prices will be confirmed before your order is placed.' : 'Check your postcode to confirm the delivery fee and total.';
 }
 deliveryPostcode.addEventListener('input', () => { clearDeliveryQuote(); potentialSequence++; showPotential(selectedItemPotential()); });
+let deliveryCheckTimer;
+function scheduleDeliveryCheck() {
+  clearTimeout(deliveryCheckTimer);
+  if (checkoutDelivery.hidden || !checkoutDialog.open) return;
+  const line = document.querySelector('#checkout-address-line1');
+  if (!line.value.trim() || !deliveryPostcode.value.trim()) return;
+  if (!validateCheckoutField(line) || !validateCheckoutField(deliveryPostcode)) return;
+  deliveryCheckTimer = setTimeout(checkDeliveryAvailability, 450);
+}
+deliveryPostcode.addEventListener('input', scheduleDeliveryCheck);
+['checkout-address-line1', 'checkout-address-line2'].forEach(id => document.getElementById(id).addEventListener('input', () => { clearDeliveryQuote(); scheduleDeliveryCheck(); }));
 async function checkDeliveryAvailability() {
   if (checkoutDelivery.hidden || pendingDeliverySequence === deliveryQuoteSequence) return;
   clearDeliveryQuote();
-  if (!validateCheckoutField(deliveryPostcode)) return;
+  if (!validateCheckoutField(document.querySelector('#checkout-address-line1')) || !validateCheckoutField(deliveryPostcode)) return;
   const sequence = deliveryQuoteSequence;
   pendingDeliverySequence = sequence;
   const button = document.querySelector('#check-delivery');
@@ -724,6 +815,7 @@ checkoutForm.addEventListener('input', () => {
 });
 checkoutForm.addEventListener('submit', async event => {
   event.preventDefault();
+  if (document.body.classList.contains('details-active')) return;
   if (location.protocol !== 'https:') { showCheckoutError('Please open the secure website before placing your order.'); return; }
   if (checkingOffer) return;
   clearCheckoutError();
