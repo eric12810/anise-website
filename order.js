@@ -453,17 +453,6 @@ const detailsTitle = element('h1', 'Your details.');
 detailsTitle.id = 'details-page-title';
 detailsHeader.append(backToBasket, detailsProgress, detailsTitle);
 checkoutDialog.setAttribute('aria-labelledby', 'details-page-title');
-const detailsType = element('div', null, 'details-type');
-detailsType.setAttribute('aria-label', 'Order type');
-for (const type of ['Collection', 'Delivery']) {
-  const button = element('button', type); button.type = 'button';
-  button.addEventListener('click', () => {
-    const basketButton = [...document.querySelectorAll('.fulfilment button')].find(x => x.textContent.trim() === type);
-    basketButton.click();
-    setDetailsOrderType(true);
-  });
-  detailsType.append(button);
-}
 const detailsAction = element('button', 'Continue to payment  ›', 'details-continue');
 detailsAction.type = 'button';
 const detailsMessage = element('p', '', 'details-message');
@@ -471,7 +460,7 @@ detailsMessage.setAttribute('role', 'status');
 const detailsSummaryTitle = element('h3', 'Your order');
 const editBasket = element('button', 'Edit basket', 'details-edit');
 editBasket.type = 'button';
-detailsAside.append(detailsSummaryTitle, editBasket);
+detailsAside.append(detailsSummaryTitle, editBasket, document.querySelector('#checkout-fulfilment'));
 const detailsFields = ['checkout-name','checkout-name-error','checkout-phone','checkout-phone-error','checkout-email','checkout-email-error','checkout-delivery'].map(id => document.getElementById(id));
 const detailsLabels = ['checkout-name','checkout-phone','checkout-email'].map(id => detailsForm.querySelector(`label[for="${id}"]`));
 function detailsField(label, input, error) {
@@ -479,7 +468,6 @@ function detailsField(label, input, error) {
   field.append(label, input, error);
   return field;
 }
-detailsMain.append(detailsType);
 for (let i = 0; i < 3; i++) {
   const field = detailsField(detailsLabels[i], detailsFields[i * 2], detailsFields[i * 2 + 1]);
   if (i === 2) field.classList.add('details-email');
@@ -514,13 +502,16 @@ function refreshDetailsSummary() {
   showPromo(subtotal);
   document.querySelector('#checkout-total').textContent = money(promoTotal(subtotal, checkoutDelivery.hidden ? 0 : (confirmedDeliveryFee || 0)));
 }
-function setDetailsOrderType(resetQuote = false) {
+let detailsOrderType = null;
+function setDetailsOrderType() {
   const delivery = document.querySelector('.fulfilment button.selected').textContent.trim() === 'Delivery';
+  const orderType = delivery ? 'Delivery' : 'Collection';
   checkoutDelivery.hidden = !delivery;
   checkoutDelivery.querySelector('#checkout-address-line1').required = delivery;
   checkoutDelivery.querySelector('#checkout-postcode').required = delivery;
-  [...detailsType.children].forEach(button => { const active = button.textContent === (delivery ? 'Delivery' : 'Collection'); button.classList.toggle('selected', active); button.setAttribute('aria-pressed', String(active)); });
-  if (resetQuote) clearDeliveryQuote();
+  document.querySelector('#checkout-fulfilment').textContent = delivery ? 'Delivery · Address and charges confirmed below' : 'Collection · 1 Kent House, Ferdinand Street, London NW1 8ET';
+  if (detailsOrderType !== orderType) clearDeliveryQuote();
+  detailsOrderType = orderType;
   refreshDetailsSummary();
   if (delivery) scheduleDeliveryCheck();
 }
