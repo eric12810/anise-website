@@ -539,7 +539,9 @@ function setDetailsOrderType() {
   checkoutDelivery.hidden = !delivery;
   checkoutDelivery.querySelector('#checkout-address-line1').required = delivery;
   checkoutDelivery.querySelector('#checkout-postcode').required = delivery;
-  document.querySelector('#checkout-fulfilment').textContent = delivery ? 'Delivery · Address and charges confirmed below' : 'Collection · 1 Kent House, Ferdinand Street, London NW1 8ET';
+  const fulfilmentSummary = document.querySelector('#checkout-fulfilment');
+  fulfilmentSummary.hidden = delivery;
+  fulfilmentSummary.textContent = delivery ? '' : 'Collection · 1 Kent House, Ferdinand Street, London NW1 8ET';
   if (detailsOrderType !== orderType) clearDeliveryQuote();
   detailsOrderType = orderType;
   refreshDetailsSummary();
