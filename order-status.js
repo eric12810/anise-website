@@ -104,7 +104,6 @@ function showOrderAnimation(order) {
     Ready: order.orderType === 'Delivery'
       ? [order.deliveryStarted ? 'delivery' : 'ready'] : ['ready', 'collection']
   }[order.status] || [];
-  animationFigure.classList.toggle('is-ready', clips.includes('ready'));
   const key = clips.join(',');
   if (key === animationKey) return;
   stopTransition();
