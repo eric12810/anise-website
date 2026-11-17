@@ -23,18 +23,21 @@
 .details-field label{margin:0}
 .details-main #checkout-delivery,.details-main #outside-radius-warning,.details-continue,.details-message{grid-column:1/-1}
 .details-email{grid-column:1}
-.details-main input:not([type=checkbox]),.details-main textarea{width:100%;padding:14px;border:1px solid #d0c4b4;background:#fff;font:inherit}
+.details-main input:not([type=checkbox]):not([type=radio]),.details-main textarea{width:100%;padding:14px;border:1px solid #d0c4b4;background:#fff;font:inherit}
 .details-main input,.details-main textarea{scroll-margin-top:160px}
 .details-summary{position:sticky;top:138px;padding:26px;background:#fff;border:1px solid #e3dbcf}
 .details-summary h3{display:inline-block;margin:0 14px 18px 0}
 .details-main h1,.details-summary h3{font-family:var(--sans);font-size:24px;font-weight:400;line-height:1.2;letter-spacing:normal}
 .payment-main > *{grid-column:1/-1}
-.payment-customer-summary{display:grid;gap:5px;padding:14px 0;border-top:1px solid #e3dbcf;border-bottom:1px solid #e3dbcf;font:14px/1.5 var(--sans)}
-.payment-customer-summary span{overflow-wrap:anywhere;color:#655c52}
+.payment-customer-summary{display:grid;gap:9px;padding:14px 0;border-top:1px solid #e3dbcf;border-bottom:1px solid #e3dbcf;font:14px/1.5 var(--sans)}
+.payment-customer-row{display:grid;grid-template-columns:105px minmax(0,1fr);gap:12px;min-width:0}
+.payment-customer-row span{color:#796d62}
+.payment-customer-row strong{font-weight:500;overflow-wrap:anywhere}
 .payment-main .details-edit{justify-self:start;margin-top:-6px}
-.payment-main fieldset{display:flex;flex-wrap:wrap;gap:12px;margin:0;padding:0;border:0}
+.payment-main fieldset{display:flex;flex-wrap:wrap;gap:12px;min-width:0;margin:0;padding:0;border:0}
 .payment-main fieldset legend{margin-bottom:10px}
-.payment-main fieldset label{display:flex;align-items:center;gap:7px;padding:10px 14px;border:1px solid #e3dbcf;cursor:pointer}
+.payment-main fieldset label{display:flex;flex:1 1 180px;align-items:center;gap:9px;min-width:0;padding:10px 14px;border:1px solid #e3dbcf;cursor:pointer}
+.payment-main fieldset input[type=radio]{flex:none;width:auto;margin:0}
 .payment-main .checkout-review{margin:0}
 .payment-main #checkout-status{margin:0;font-size:13px;line-height:1.5}
 .payment-main button[type=submit]{width:100%;padding:17px 20px;text-align:left;text-transform:uppercase;letter-spacing:.13em;font:600 13px var(--sans);cursor:pointer}

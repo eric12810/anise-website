@@ -577,12 +577,14 @@ function showDetails(updateHistory = true) {
 }
 function showPayment() {
   const address = [checkoutForm.elements.addressLine1.value.trim(), checkoutForm.elements.addressLine2.value.trim(), checkoutForm.elements.postcode.value.trim()].filter(Boolean).join(', ');
-  customerSummary.replaceChildren(
-    element('strong', checkoutDelivery.hidden ? 'Collection' : 'Delivery'),
-    element('span', checkoutForm.elements.name.value.trim()),
-    element('span', checkoutForm.elements.phone.value.trim() + ' · ' + checkoutForm.elements.email.value.trim())
-  );
-  customerSummary.append(element('span', checkoutDelivery.hidden ? 'Collect from 1 Kent House, Ferdinand Street, London NW1 8ET' : address));
+  const customerRow = (label, value) => {
+    const row = element('div', null, 'payment-customer-row');
+    row.append(element('span', label), element('strong', value));
+    return row;
+  };
+  customerSummary.replaceChildren(customerRow('Name', checkoutForm.elements.name.value.trim()));
+  if (!checkoutDelivery.hidden) customerSummary.append(customerRow('Address', address));
+  customerSummary.append(customerRow('Phone number', checkoutForm.elements.phone.value.trim()), customerRow('Email', checkoutForm.elements.email.value.trim()));
   detailsMain.hidden = true; paymentMain.hidden = false;
   detailsHeader.hidden = true; paymentHeader.hidden = false;
   detailsProgressWrap.hidden = true; paymentProgressWrap.hidden = false;
@@ -732,7 +734,9 @@ function clearDeliveryQuote() {
   showPromo(subtotal);
   document.querySelector('#checkout-total').textContent = money(promoTotal(subtotal));
   document.querySelector('#checkout-review-total').textContent = checkoutDelivery.hidden ? money(promoTotal(subtotal)) : 'Delivery check required';
-  document.querySelector('#checkout-review-note').textContent = checkoutDelivery.hidden ? 'Prices will be confirmed before your order is placed.' : 'Check your postcode to confirm the delivery fee and total.';
+  const reviewNote = document.querySelector('#checkout-review-note');
+  reviewNote.hidden = false;
+  reviewNote.textContent = checkoutDelivery.hidden ? 'Prices will be confirmed before your order is placed.' : 'Check your postcode to confirm the delivery fee and total.';
 }
 deliveryPostcode.addEventListener('input', () => { clearDeliveryQuote(); potentialSequence++; showPotential(selectedItemPotential()); });
 let deliveryCheckTimer;
@@ -773,7 +777,9 @@ async function checkDeliveryAvailability() {
     document.querySelector('#checkout-total').textContent = money(promoTotal(subtotal, result.deliveryFee));
     document.querySelector('#checkout-review-total').textContent = money(promoTotal(subtotal, result.deliveryFee));
     refreshPotentialOffer();
-    document.querySelector('#checkout-review-note').textContent = deliveryRequiresApproval ? 'This address is outside our normal delivery radius. Anise will review your order and may decline it.' : 'Prices and availability will be checked again when you place your order.';
+    const reviewNote = document.querySelector('#checkout-review-note');
+    reviewNote.hidden = !deliveryRequiresApproval;
+    reviewNote.textContent = deliveryRequiresApproval ? 'This address is outside our normal delivery radius. Anise will review your order and may decline it.' : '';
   } catch (_) {
     if (sequence === deliveryQuoteSequence && !checkoutDelivery.hidden) deliveryResult.textContent = 'Delivery availability is temporarily unavailable. Please try again later.';
   } finally {
