@@ -161,6 +161,7 @@ function element(tag, text, className) {
 }
 function openDish(product, category) {
   currentDish = product;
+  window.AniseAnalytics?.event('view_item', {currency: 'GBP', items: [{item_id: String(product.id), item_name: product.name, price: Number(product.variants[0]?.price || 0), quantity: 1}]});
   const dialogImage = dialog.querySelector('.dialog-image');
   dialogImage.querySelector('img')?.remove();
   dialogImage.setAttribute('aria-label', 'Dish image placeholder');
@@ -374,6 +375,7 @@ form.addEventListener('submit', event => {
   const key = JSON.stringify([variant.id, modifiers.map(m => m.id).sort(), notes]);
   const entry = selected.get(key) || {variantId: variant.id, productId: currentDish.id, displayedDiscount: itemDiscounts.get(currentDish.id) ? {...itemDiscounts.get(currentDish.id), orderType: document.querySelector('.fulfilment button.selected').textContent.trim()} : null, name: currentDish.name, variant: variant.name, notes, modifiers, price: variant.price + modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0), quantity: 0};
   entry.quantity += Number(quantityInput.value); selected.set(key, entry); render(); dialog.close();
+  window.AniseAnalytics?.event('add_to_cart', {currency: 'GBP', value: entry.price * Number(quantityInput.value), items: [window.AniseAnalytics.item({...entry, quantity: Number(quantityInput.value)})]});
   basketRevision++; saveBasket();
 });
 
@@ -630,6 +632,7 @@ function setDetailsOrderType() {
   if (delivery) scheduleDeliveryCheck();
 }
 function openDetails() {
+  window.AniseAnalytics?.event('begin_checkout', {currency: 'GBP', value: [...selected.values()].reduce((sum, item) => sum + item.price * item.quantity, 0), items: window.AniseAnalytics.items([...selected.values()])});
   basketPage.hidden = true;
   checkoutDialog.show();
   document.body.classList.remove('basket-active');
@@ -705,6 +708,7 @@ detailsAction.addEventListener('click', () => {
   if (!checkoutDelivery.hidden && confirmedDeliveryFee === null) { deliveryPostcode.focus(); detailsMessage.textContent = 'Enter a valid delivery address and wait for availability to be confirmed.'; return; }
   if (deliveryRequiresApproval && !document.querySelector('#outside-radius-acknowledgement').checked) { document.querySelector('#outside-radius-acknowledgement').focus(); detailsMessage.textContent = 'Please acknowledge the delivery radius notice.'; return; }
   detailsMessage.textContent = '';
+  if (!checkoutDelivery.hidden) window.AniseAnalytics?.event('add_shipping_info', {currency: 'GBP', shipping_tier: 'Delivery', items: window.AniseAnalytics.items([...selected.values()])});
   showPayment();
 });
 let potentialSaving = 0, potentialOffer = null, potentialSequence = 0, acceptedOfferSignature = null;
@@ -1134,6 +1138,7 @@ checkoutForm.addEventListener('submit', async event => {
   }
   checkoutSubmit.disabled = true;
   checkoutStatus.textContent = 'Sending your order…';
+  window.AniseAnalytics?.event('add_payment_info', {currency: 'GBP', payment_type: isCard ? 'card' : 'cash', value: data.expectedTotal, items: window.AniseAnalytics.items([...selected.values()])});
   try {
     const response = await fetch(isCard ? window.AnisePos.api + '/api/website/stripe-checkout' : window.AnisePos.api + '/api/website/orders/cash', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, credentials: 'omit',
@@ -1191,10 +1196,12 @@ checkoutForm.addEventListener('submit', async event => {
           offer: {hidden: document.querySelector('#offer-row').hidden, name: document.querySelector('#offer-name').textContent,
             discount: document.querySelector('#offer-discount').textContent}}));
       } catch (_) { showCheckoutError('Your browser cannot save your basket for a return from payment. Please try again with storage enabled.'); return; }
+      try { sessionStorage.setItem('anise.analytics.pending', JSON.stringify({requestId: pending.requestId, payment: 'card', value: Number(data.expectedTotal), items: window.AniseAnalytics.items([...selected.values()])})); } catch (_) {}
       location.assign(url.href); return;
     }
     if (!result.orderNumber) throw new Error('Missing order number');
     window.AnisePromotionCookie.markReturning();
+    try { sessionStorage.setItem('anise.analytics.pending', JSON.stringify({requestId: pending.requestId, payment: 'cash', value: Number(result.total), items: window.AniseAnalytics.items([...selected.values()])})); } catch (_) {}
     if (location.protocol === 'https:') {
       try { sessionStorage.setItem(trackingKey, JSON.stringify({requestId: pending.requestId, orderNumber: result.orderNumber})); } catch (_) {}
       clearInterval(trackingTimer);

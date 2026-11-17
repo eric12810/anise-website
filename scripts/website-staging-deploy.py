@@ -27,7 +27,7 @@ MANIFEST_VERSION = 1
 ROOT_FILES = """index.html menu.html order.html order-status.html philosophy.html
 creations.html vegan.html stripe-cancelled.html styles.css creations-hero-carousel.css
 menu-live.js order.css checkout-progress.css checkout-details.css basket-storage.js order.js order-status.js ordering-status.js plum-background.js
-promotion-cookie.js promotions-display.js stripe-resume.js pos-environment.js dish-thumbnail.ashx""".split()
+promotion-cookie.js promotions-display.js stripe-resume.js pos-environment.js analytics-config.js analytics.js analytics.css dish-thumbnail.ashx""".split()
 PUBLIC_EXTENSIONS = {".svg", ".png", ".webp", ".jpg", ".jpeg", ".mp4",
                      ".eot", ".ttf", ".woff", ".woff2"}
 PATH_PATTERN = re.compile(r"[A-Za-z0-9_./-]+\Z")

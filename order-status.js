@@ -108,6 +108,10 @@ async function refresh() {
     if (!response.ok) throw new Error();
     const order = await response.json();
     showOrderAnimation(order);
+    try {
+      const snapshot = JSON.parse(sessionStorage.getItem('anise.analytics.pending') || 'null');
+      if (window.AniseAnalytics?.purchase(token, order, snapshot)) sessionStorage.removeItem('anise.analytics.pending');
+    } catch (_) {}
     if (!['Cancelled','Refunded'].includes(order.status)) window.AnisePromotionCookie.markReturning();
     try {
       const pending = JSON.parse(sessionStorage.getItem('anise.pendingCardOrder') || 'null');

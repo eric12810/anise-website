@@ -1,0 +1,3 @@
+#analytics-consent{position:fixed;z-index:10000;bottom:16px;left:16px;right:16px;max-width:620px;padding:18px;background:#fff;color:#302522;border:1px solid #a88d70;box-shadow:0 6px 24px #0004;font:16px/1.4 Arial,sans-serif}
+#analytics-consent p{margin:0 0 12px}#analytics-consent button{margin:4px 8px 0 0;padding:9px 13px;border:1px solid #302522;background:#fff;color:#302522;cursor:pointer}#analytics-consent button:last-child{background:#302522;color:#fff}
+#analytics-settings{position:fixed;z-index:9999;bottom:0;right:0;padding:5px 9px;border:1px solid #a88d70;background:#fff;color:#302522;font:12px Arial,sans-serif;cursor:pointer}
