@@ -474,8 +474,23 @@ editBasket.type = 'button';
 detailsAside.append(detailsSummaryTitle, editBasket);
 const detailsFields = ['checkout-name','checkout-name-error','checkout-phone','checkout-phone-error','checkout-email','checkout-email-error','checkout-delivery'].map(id => document.getElementById(id));
 const detailsLabels = ['checkout-name','checkout-phone','checkout-email'].map(id => detailsForm.querySelector(`label[for="${id}"]`));
+function detailsField(label, input, error) {
+  const field = element('div', null, 'details-field');
+  field.append(label, input, error);
+  return field;
+}
 detailsMain.append(detailsType);
-for (let i = 0; i < 3; i++) detailsMain.append(detailsLabels[i], detailsFields[i * 2], detailsFields[i * 2 + 1]);
+for (let i = 0; i < 3; i++) {
+  const field = detailsField(detailsLabels[i], detailsFields[i * 2], detailsFields[i * 2 + 1]);
+  if (i === 2) field.classList.add('details-email');
+  detailsMain.append(field);
+}
+for (const id of ['checkout-address-line1', 'checkout-address-line2', 'checkout-postcode']) {
+  const input = document.getElementById(id);
+  const label = checkoutDelivery.querySelector(`label[for="${id}"]`);
+  const error = document.getElementById(id + '-error');
+  checkoutDelivery.insertBefore(detailsField(label, input, error), checkoutDelivery.querySelector('#check-delivery'));
+}
 detailsMain.append(detailsFields[6], document.querySelector('#outside-radius-warning'), detailsAction, detailsMessage);
 detailsAside.append(document.querySelector('#checkout-summary'), document.querySelector('#delivery-fee-row'), document.querySelector('#promo-discount-row'), document.querySelector('#offer-row'), document.querySelector('#checkout-total').parentElement);
 detailsColumns.append(detailsMain, detailsAside);
