@@ -12,6 +12,7 @@
 .checkout-progress .is-complete{color:#566a4d}
 .checkout-progress .is-complete .checkout-progress-bar{background:#87a854}
 .details-header h1{margin:0;font-size:clamp(38px,5vw,64px);line-height:1.1;font-weight:400}
+.details-header h1[tabindex="-1"]:focus{outline:none}
 .details-columns{display:grid;grid-template-columns:minmax(0,1fr) minmax(290px,340px);gap:clamp(32px,4vw,64px);align-items:start}
 .details-main{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px;row-gap:16px;max-width:720px}
 .details-field{display:grid;align-content:start;gap:7px;min-width:0}
