@@ -485,6 +485,7 @@ const editDetails = element('button', 'Edit details', 'details-edit');
 editDetails.type = 'button';
 const paymentMethods = checkoutForm.querySelector('fieldset');
 const paymentReview = checkoutForm.querySelector('.checkout-review');
+const outsideRadiusWarning = document.querySelector('#outside-radius-warning');
 const paymentStatus = document.querySelector('#checkout-status');
 const paymentSubmit = checkoutForm.querySelector('button[type="submit"]');
 paymentMain.append(paymentTitle, customerSummary, editDetails, paymentMethods, paymentReview, paymentStatus, paymentSubmit);
@@ -507,7 +508,7 @@ for (const id of ['checkout-address-line1', 'checkout-address-line2', 'checkout-
   const error = document.getElementById(id + '-error');
   checkoutDelivery.insertBefore(detailsField(label, input, error), checkoutDelivery.querySelector('#delivery-result'));
 }
-detailsMain.append(detailsFields[6], document.querySelector('#outside-radius-warning'), detailsAction, detailsMessage);
+detailsMain.append(detailsFields[6], outsideRadiusWarning, detailsAction, detailsMessage);
 detailsMain.prepend(detailsTitle);
 detailsAside.append(document.querySelector('#checkout-summary'), document.querySelector('#delivery-fee-row'), document.querySelector('#promo-discount-row'), document.querySelector('#offer-row'), document.querySelector('#checkout-total').parentElement);
 detailsColumns.append(detailsMain, paymentMain, detailsAside);
