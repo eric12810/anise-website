@@ -338,6 +338,7 @@ form.addEventListener('submit', event => {
   const entry = selected.get(key) || {variantId: variant.id, productId: currentDish.id, displayedDiscount: itemDiscounts.get(currentDish.id) ? {...itemDiscounts.get(currentDish.id), orderType: document.querySelector('.fulfilment button.selected').textContent.trim()} : null, name: currentDish.name, variant: variant.name, notes, modifiers, price: variant.price + modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0), quantity: 0};
   entry.quantity += Number(quantityInput.value); selected.set(key, entry); render(); dialog.close();
 });
+
 dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
 function change(key, amount) {
   const entry = selected.get(key); if (!entry) return;
@@ -488,7 +489,10 @@ const paymentReview = checkoutForm.querySelector('.checkout-review');
 const outsideRadiusWarning = document.querySelector('#outside-radius-warning');
 const paymentStatus = document.querySelector('#checkout-status');
 const paymentSubmit = checkoutForm.querySelector('button[type="submit"]');
-paymentMain.append(paymentTitle, customerSummary, editDetails, paymentMethods, paymentReview, paymentStatus, paymentSubmit);
+const paymentReturnMessage = element('p', '', 'payment-return-message');
+paymentReturnMessage.setAttribute('role', 'status');
+paymentReturnMessage.hidden = true;
+paymentMain.append(paymentTitle, customerSummary, editDetails, paymentReturnMessage, paymentMethods, paymentReview, paymentStatus, paymentSubmit);
 detailsAside.append(detailsSummaryTitle, editBasket, document.querySelector('#checkout-fulfilment'));
 const detailsFields = ['checkout-name','checkout-name-error','checkout-phone','checkout-phone-error','checkout-email','checkout-email-error','checkout-delivery'].map(id => document.getElementById(id));
 const detailsLabels = ['checkout-name','checkout-phone','checkout-email'].map(id => detailsForm.querySelector(`label[for="${id}"]`));
@@ -822,6 +826,30 @@ let checkingOffer = false;
 const checkoutSubmit = checkoutForm.querySelector('button[type="submit"]');
 const pendingKey = 'anise.pendingCashOrder';
 const pendingCardKey = 'anise.pendingCardOrder';
+const cardReturnKey = 'anise.cardReturnState';
+let returnedCardReference = null;
+async function stripeReturnState(requestId, expire = false) {
+  const response = await fetch(window.AnisePos.api + '/api/website/stripe-return', {
+    method:'POST', credentials:'omit', cache:'no-store', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({requestId, expire}), signal:AbortSignal.timeout(12000)
+  });
+  if (!response.ok) throw new Error('We could not confirm your payment status. Please try again or check your order status.');
+  return (await response.json()).state;
+}
+function returnedOrderChanged() {
+  let original;
+  try { original = JSON.parse(sessionStorage.getItem(pendingCardKey) || 'null')?.data; } catch (_) {}
+  if (!original) return true;
+  const currentLines = [...selected.values()].map(item => ({variantId:item.variantId, quantity:item.quantity,
+    modifierIds:item.modifiers.map(modifier => modifier.id), notes:item.notes}));
+  return original.orderType !== (checkoutDelivery.hidden ? 'Collection' : 'Delivery') ||
+    original.name !== checkoutForm.elements.name.value.trim() || original.phone !== checkoutForm.elements.phone.value.trim() ||
+    original.email !== checkoutForm.elements.email.value.trim() ||
+    (original.addressLine1 || '') !== (checkoutDelivery.hidden ? '' : checkoutForm.elements.addressLine1.value.trim()) ||
+    (original.addressLine2 || '') !== (checkoutDelivery.hidden ? '' : checkoutForm.elements.addressLine2.value.trim()) ||
+    (original.postcode || '') !== (checkoutDelivery.hidden ? '' : checkoutForm.elements.postcode.value.trim()) ||
+    JSON.stringify(original.lines) !== JSON.stringify(currentLines);
+}
 let cardAvailable = false;
 fetch(window.AnisePos.api + '/api/website/card-availability', {method:'POST',credentials:'omit',signal:AbortSignal.timeout(12000)}).then(r => r.ok ? r.json() : {}).then(result => { cardAvailable = result.available === true; updateCheckoutPayment(); }).catch(() => {});
 const trackingKey = 'anise.currentOrderStatus';
@@ -873,7 +901,18 @@ function updateCheckoutPayment() {
   checkoutStatus.textContent = cash ? 'Your order will be sent to the restaurant for confirmation. Cash payment is due on collection or delivery.' : cardAvailable ? 'You will continue to Stripe’s secure checkout. Your order will be sent to the restaurant after payment is confirmed.' : 'Card payment is not available yet.';
 }
 checkoutForm.addEventListener('change', event => {
-  if (event.target.name === 'payment') { clearCheckoutError(); updateCheckoutPayment(); }
+  if (event.target.name === 'payment') {
+    clearCheckoutError(); updateCheckoutPayment();
+    if (returnedCardReference) {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(cardReturnKey) || 'null');
+        if (saved?.requestId === returnedCardReference) {
+          saved.payment = checkoutForm.elements.payment.value;
+          sessionStorage.setItem(cardReturnKey, JSON.stringify(saved));
+        }
+      } catch (_) { /* The submit path will block if the return state is unavailable. */ }
+    }
+  }
 });
 checkoutForm.addEventListener('input', () => {
   if (!reviewedOffer) return;
@@ -891,6 +930,25 @@ checkoutForm.addEventListener('submit', async event => {
   if (location.protocol !== 'https:') { showCheckoutError('Please open the secure website before placing your order.'); return; }
   if (checkingOffer) return;
   clearCheckoutError();
+  if (returnedCardReference) {
+    checkingOffer = true;
+    checkoutSubmit.disabled = true;
+    checkoutStatus.textContent = 'Confirming the previous payment status…';
+    let returnError = null;
+    try {
+      const cash = checkoutForm.elements.payment.value === 'cash';
+      const state = await stripeReturnState(returnedCardReference, cash || returnedOrderChanged());
+      if (state === 'recorded') { location.assign('order-status#' + encodeURIComponent(returnedCardReference)); return; }
+      if (state === 'verifying') throw new Error('Your earlier card payment may be completing. Check its status before trying another payment.');
+      if (state === 'expired') {
+        sessionStorage.removeItem(pendingCardKey);
+        sessionStorage.removeItem(cardReturnKey);
+        returnedCardReference = null;
+      } else if (state !== 'open' || cash) throw new Error('We could not safely start another payment. Please check your order status.');
+    } catch (error) { returnError = error.message; }
+    finally { checkingOffer = false; updateCheckoutPayment(); }
+    if (returnError) { showCheckoutError(returnError); return; }
+  }
   const foodSubtotal = [...selected.values()].reduce((sum, item) => sum + item.quantity * item.price, 0);
   if (!checkoutDelivery.hidden && Math.round(foodSubtotal * 100) < 1800) { showCheckoutError('The minimum food subtotal for delivery is £18.00.'); return; }
   const validFields = checkoutFields.map(validateCheckoutField).every(Boolean);
@@ -1033,6 +1091,13 @@ checkoutForm.addEventListener('submit', async event => {
     if (isCard) {
       const url = new URL(result.url);
       if (url.protocol !== 'https:' || url.hostname !== 'checkout.stripe.com' || url.port || url.username || url.password) throw new Error('Unexpected checkout address');
+      try {
+        sessionStorage.setItem(cardReturnKey, JSON.stringify({requestId: pending.requestId, entries: [...selected], orderType: data.orderType,
+          deliveryFee: confirmedDeliveryFee, requiresApproval: deliveryRequiresApproval, outsideRadiusAcknowledged: document.querySelector('#outside-radius-acknowledgement').checked,
+          promo: appliedPromo, payment: checkoutForm.elements.payment.value,
+          offer: {hidden: document.querySelector('#offer-row').hidden, name: document.querySelector('#offer-name').textContent,
+            discount: document.querySelector('#offer-discount').textContent}}));
+      } catch (_) { showCheckoutError('Your browser cannot save your basket for a return from payment. Please try again with storage enabled.'); return; }
       location.assign(url.href); return;
     }
     if (!result.orderNumber) throw new Error('Missing order number');
@@ -1052,3 +1117,74 @@ checkoutForm.addEventListener('submit', async event => {
     else showCheckoutError('We could not confirm your order. Retry without changing it, or call us on 020 7916 4976.');
   } finally { if (selected.size && (checkoutForm.elements.payment.value === 'cash' || cardAvailable)) checkoutSubmit.disabled = false; }
 });
+
+async function restoreStripeReturn() {
+  const requestId = new URLSearchParams(location.search).get('stripe_cancel');
+  if (!requestId) return;
+  const validReference = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requestId);
+  let pending, saved;
+  try {
+    pending = JSON.parse(sessionStorage.getItem(pendingCardKey) || 'null');
+    saved = JSON.parse(sessionStorage.getItem(cardReturnKey) || 'null');
+  } catch (_) { /* Missing browser storage is handled below. */ }
+  if (!validReference || pending?.requestId !== requestId || saved?.requestId !== requestId || !Array.isArray(saved.entries) || !pending.data) {
+    tracking.hidden = false;
+    showTracking('We could not restore this checkout. Check your order status before starting another payment.');
+    return;
+  }
+  let state;
+  try { state = await stripeReturnState(requestId); }
+  catch (_) {
+    tracking.hidden = false;
+    showTracking('We could not confirm your payment status. Please refresh this page before trying again.');
+    return;
+  }
+  if (state === 'recorded') { location.assign('order-status#' + encodeURIComponent(requestId)); return; }
+  if (!['open', 'verifying', 'expired'].includes(state)) return;
+  const lines = saved.entries.map(entry => entry?.[1]);
+  if (lines.length < 1 || lines.length > 50 || lines.some(item => !item || !Number.isInteger(item.quantity) || item.quantity < 1 || !Array.isArray(item.modifiers)) ||
+      JSON.stringify(lines.map(item => ({variantId:item.variantId, quantity:item.quantity, modifierIds:item.modifiers.map(modifier => modifier.id), notes:item.notes}))) !== JSON.stringify(pending.data.lines)) {
+    tracking.hidden = false;
+    showTracking('The saved basket could not be restored. Check your order status before starting another payment.');
+    return;
+  }
+  selected.clear();
+  saved.entries.forEach(([key, item]) => selected.set(key, item));
+  document.querySelectorAll('.fulfilment button').forEach(button => {
+    const active = button.textContent.trim() === pending.data.orderType;
+    button.classList.toggle('selected', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+  for (const [name, value] of Object.entries({name:pending.data.name, phone:pending.data.phone, email:pending.data.email,
+    addressLine1:pending.data.addressLine1, addressLine2:pending.data.addressLine2, postcode:pending.data.postcode}))
+    checkoutForm.elements[name].value = value || '';
+  checkoutForm.elements.payment.value = saved.payment === 'cash' ? 'cash' : 'card';
+  appliedPromo = saved.promo || null;
+  render();
+  openDetails();
+  confirmedDeliveryFee = pending.data.orderType === 'Delivery' ? saved.deliveryFee : null;
+  deliveryRequiresApproval = pending.data.orderType === 'Delivery' && saved.requiresApproval === true;
+  outsideRadiusWarning.hidden = !deliveryRequiresApproval;
+  document.querySelector('#outside-radius-acknowledgement').checked = saved.outsideRadiusAcknowledged === true;
+  deliveryFeeRow.hidden = confirmedDeliveryFee === null;
+  if (confirmedDeliveryFee !== null) document.querySelector('#delivery-fee').textContent = money(confirmedDeliveryFee);
+  refreshDetailsSummary();
+  if (Number.isFinite(pending.data.expectedTotal)) document.querySelector('#checkout-total').textContent = money(pending.data.expectedTotal);
+  document.querySelector('#checkout-review-total').textContent = document.querySelector('#checkout-total').textContent;
+  if (saved.offer) {
+    document.querySelector('#offer-row').hidden = saved.offer.hidden !== false;
+    document.querySelector('#offer-name').textContent = saved.offer.name || 'Offer';
+    document.querySelector('#offer-discount').textContent = saved.offer.discount || '';
+    if (!document.querySelector('#offer-row').hidden) document.querySelector('#promo-discount-row').hidden = true;
+  }
+  const reviewNote = document.querySelector('#checkout-review-note');
+  reviewNote.hidden = !deliveryRequiresApproval;
+  reviewNote.textContent = deliveryRequiresApproval ? 'This address is outside our normal delivery radius. Anise will review your order and may decline it.' : '';
+  showPayment();
+  returnedCardReference = requestId;
+  paymentReturnMessage.hidden = false;
+  paymentReturnMessage.textContent = state === 'verifying'
+    ? 'Your payment may still be processing. Check your order status before trying again.'
+    : 'Payment wasn’t completed. You can retry your card or choose cash; we’ll check the earlier payment first.';
+}
+restoreStripeReturn();

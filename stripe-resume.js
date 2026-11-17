@@ -10,6 +10,12 @@
   try { pending = JSON.parse(sessionStorage.getItem('anise.pendingCardOrder') || 'null'); } catch (_) {}
   const canResume = validToken && pending?.requestId === token && pending.data &&
     typeof pending.data === 'object' && !Array.isArray(pending.data);
+  let savedReturn;
+  try { savedReturn = JSON.parse(sessionStorage.getItem('anise.cardReturnState') || 'null'); } catch (_) {}
+  if (canResume && savedReturn?.requestId === token && Array.isArray(savedReturn.entries)) {
+    location.replace('order?stripe_cancel=' + encodeURIComponent(token));
+    return;
+  }
   statusLink.hidden = !validToken;
   if (!validToken) {
     message.textContent = 'This payment link is incomplete. Return to the original checkout tab or call us before placing another order.';

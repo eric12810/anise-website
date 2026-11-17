@@ -39,6 +39,7 @@
 .payment-main fieldset label{display:flex;flex:1 1 180px;align-items:center;gap:9px;min-width:0;padding:10px 14px;border:1px solid #e3dbcf;cursor:pointer}
 .payment-main fieldset input[type=radio]{flex:none;width:auto;margin:0}
 .payment-main .checkout-review{margin:0}
+.payment-return-message{margin:0;padding:12px 14px;background:#f5f8ef;border:1px solid #dce6d2;color:#566a4d;font:13px/1.5 var(--sans)}
 .payment-main #checkout-status{margin:0;font-size:13px;line-height:1.5}
 .payment-main button[type=submit]{width:100%;padding:17px 20px;text-align:left;text-transform:uppercase;letter-spacing:.13em;font:600 13px var(--sans);cursor:pointer}
 .details-summary #checkout-fulfilment{margin:0 0 12px;color:#796d62;font:13px/1.5 var(--serif)}
