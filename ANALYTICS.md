@@ -1,6 +1,6 @@
 # GA4 configuration
 
-Set distinct GA4 web data stream Measurement IDs (`G-…`) in `analytics-config.js`: `staging` for `www.staging.loveanise.co.uk` / `staging.loveanise.co.uk`, and `production` for `www.loveanise.co.uk` / `loveanise.co.uk`. The checked-in empty values disable tracking. Never reuse an ID across environments. Other hosts remain disabled. Do not publish this staging checkout to production without reviewing its POS routing and setting the production ID.
+The distinct GA4 web data stream Measurement IDs are set in `analytics-config.js`: `G-L2E3Y4ZWP3` for `www.staging.loveanise.co.uk` / `staging.loveanise.co.uk`, and `G-THXRYF3HXQ` for `www.loveanise.co.uk` / `loveanise.co.uk`. Never reuse an ID across environments. Other hosts remain disabled. Do not publish this staging checkout to production without reviewing its POS routing and release process.
 
 Analytics is optional. No Google script loads until a visitor accepts the banner. The persistent Analytics cookies control reopens the choice; rejecting after acceptance clears the choice and reloads so no further events are sent. The choice uses local storage and contains no customer data. The site's separate `promotion-cookie.js` is a functional returning-customer cookie, not analytics consent. Review the site's privacy/cookie notice before deployment and disclose GA4, its purpose, retention, and how to withdraw consent.
 
