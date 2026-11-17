@@ -149,7 +149,6 @@ async function refreshItemDiscounts() {
       if (!previous || discount.percent > previous.percent || discount.percent === previous.percent && discount.minimumSubtotal < previous.minimumSubtotal) itemDiscounts.set(discount.productId, discount);
     }
     updateDishPrices();
-    trackMenuCategory();
   } catch (_) { if (sequence === discountFetchSequence) { itemDiscounts = new Map(); updateDishPrices(); } }
 }
 
@@ -307,6 +306,7 @@ async function loadMenu() {
       section.append(heading, grid); list.append(section);
     });
     status.textContent = displayed ? '' : 'There are no dishes available right now. Please call us for the current menu.';
+    trackMenuCategory();
     updateDishPrices();
     const saved = basketStorage.read();
     if (saved && basketRevision === 0 && !new URLSearchParams(location.search).has('stripe_cancel')) restoreBasket(saved, categories);
