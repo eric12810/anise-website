@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Resolve one successful, deployed staging release through the GitHub API."""
 import json, os, sys, urllib.request
-repo=os.environ.get('GITHUB_REPOSITORY',''); token=os.environ.get('GITHUB_TOKEN',''); run_id=os.environ.get('STAGING_RUN_ID','')
+repo=os.environ.get('GITHUB_REPOSITORY',''); token=os.environ.get('GITHUB_TOKEN',''); run_id=os.environ.get('STAGING_RUN_ID','').strip()
 if not repo or not token or not run_id.isdigit(): raise SystemExit('A numeric staging Run ID and GitHub token are required')
 def get(path):
     req=urllib.request.Request('https://api.github.com/repos/'+repo+path, headers={'Authorization':'Bearer '+token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'})
