@@ -22,14 +22,17 @@ def stage(label):
     print('Stage: ' + label, flush=True)
 
 def safe_file(name):
+    if not isinstance(name, str):
+        return False
     p = PurePosixPath(name)
-    return (isinstance(name, str) and bool(re.fullmatch(r'[A-Za-z0-9_./-]+', name))
+    return (bool(re.fullmatch(r'[A-Za-z0-9_./-]+', name))
             and not p.is_absolute() and '..' not in p.parts
             and not any(x.startswith('.') for x in p.parts)
             and not any(x.lower() in {'web.config', 'data', 'app_data', 'logs', 'secrets'}
                         or x.lower().startswith('appsettings') for x in p.parts)
-            and p.suffix.lower() in {'.html', '.css', '.js', '.ashx', '.svg', '.png',
-                '.webp', '.jpg', '.jpeg', '.mp4', '.eot', '.ttf', '.woff', '.woff2'})
+            and (name in {'robots.txt', 'sitemap.xml'} or p.suffix.lower() in
+                 {'.html', '.css', '.js', '.ashx', '.svg', '.png', '.webp', '.jpg',
+                  '.jpeg', '.mp4', '.eot', '.ttf', '.woff', '.woff2'}))
 
 def curl_upload(host, username, password, root, name, local):
     # A leading // in an FTP URL means an absolute server path, not login-relative.

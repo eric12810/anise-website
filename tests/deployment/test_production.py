@@ -7,6 +7,32 @@ spec = importlib.util.spec_from_file_location('production', Path(__file__).paren
 production = importlib.util.module_from_spec(spec); spec.loader.exec_module(production)
 
 class ProductionGuardTests(unittest.TestCase):
+    def test_validation_logging_reports_check_without_secret_values(self):
+        self.assertEqual('Unsafe release manifest path', production.failure_reason(ValueError('Unsafe release manifest path')))
+        self.assertEqual('ValueError', production.failure_reason(ValueError('secret-password')))
+
+    def test_release_builder_matches_production_file_policy(self):
+        root = Path(__file__).parents[2]
+        subprocess.run([sys.executable, 'scripts/release-artifact.py'], cwd=root, check=True, capture_output=True)
+        source = root / 'artifacts/website-release'
+        files = json.loads((source / 'release-manifest.json').read_text())['files']
+        self.assertIn('robots.txt', files)
+        self.assertIn('sitemap.xml', files)
+        self.assertNotIn('web.config', files)
+        self.assertTrue(all(production.transport.safe_file(name) for name in files))
+        commit = 'a' * 40
+        with tempfile.TemporaryDirectory() as d:
+            bundle = Path(d)
+            for name in files:
+                target = bundle / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((source / name).read_bytes())
+            (bundle / 'release-manifest.json').write_bytes((source / 'release-manifest.json').read_bytes())
+            (bundle / 'staging-deployment-record.json').write_text(json.dumps({
+                'status': 'verified', 'run_id': '42', 'commit_sha': commit,
+                'artifact_name': 'anise-website-staging-release-' + commit}))
+            self.assertEqual(files, production.verify_bundle(bundle, '42', commit))
+
     def test_hash_mismatch_is_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d); (root/'index.html').write_text('safe')

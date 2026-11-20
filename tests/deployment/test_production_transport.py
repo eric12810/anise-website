@@ -80,8 +80,12 @@ class Tests(unittest.TestCase):
         with self.assertRaises(OSError): self.run_mode('deploy')
         self.assertIn(t.PENDING, self.ftp.files)
     def test_protected_files(self):
-        for name in ('web.config', 'appsettings.json', 'data/key.js', '../index.html', '.env', 'public/web.config'):
+        for name in ('web.config', 'appsettings.json', 'data/key.js', '../index.html', '.env', 'public/web.config',
+                     'other.txt', 'other.xml', 'public/robots.txt', 'public/sitemap.xml',
+                     '../robots.txt', '/sitemap.xml', 'data/robots.txt'):
             self.assertFalse(t.safe_file(name))
+        for name in ('robots.txt', 'sitemap.xml'):
+            self.assertTrue(t.safe_file(name))
     def test_curl_path_tls_and_credentials(self):
         with patch.object(t.subprocess, 'run', return_value=Mock(returncode=0)) as run:
             t.curl_upload('host', 'user', 'private', '/livesiteftp/wwwroot', 'index.html', self.bundle/'index.html')
