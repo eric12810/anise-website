@@ -9,10 +9,12 @@ EXPECTED_HOST = os.environ.get("PROD_FTPS_EXPECTED_HOST", "")
 EXPECTED_ROOT = os.environ.get("PROD_FTPS_EXPECTED_ROOT", "")
 
 def verify_bundle(bundle, staging_run_id=None, commit_sha=None):
+    transport.stage('validate release manifest')
     manifest = json.loads((bundle / "release-manifest.json").read_text())
     files = manifest.get("files")
     if not isinstance(files, dict) or not files:
         raise ValueError("Invalid release manifest")
+    transport.stage('validate release file paths and SHA-256 hashes')
     for name, digest in files.items():
         p = PurePosixPath(name)
         if not transport.safe_file(name) or not isinstance(digest, str):
@@ -22,6 +24,7 @@ def verify_bundle(bundle, staging_run_id=None, commit_sha=None):
             raise ValueError("Release SHA-256 verification failed")
         if b'https://pos-staging.loveanise.co.uk/api' in path.read_bytes() and name not in {'pos-environment.js', 'dish-thumbnail.ashx'}:
             raise ValueError("Production release contains a staging POS reference")
+    transport.stage('validate staging deployment evidence')
     record = json.loads((bundle / "staging-deployment-record.json").read_text())
     if record.get('status') != 'verified' or record.get('run_id') != str(staging_run_id) or record.get('commit_sha') != commit_sha or record.get('artifact_name') != 'anise-website-staging-release-'+commit_sha:
         raise ValueError("Staging deployment evidence does not match selected release")
@@ -51,10 +54,20 @@ def check_settings(host, root, require_credentials):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument("--bundle", required=True); ap.add_argument("--staging-run-id", required=True); ap.add_argument("--commit-sha", required=True); ap.add_argument("--host", required=True); ap.add_argument("--root", required=True); ap.add_argument("--mode", choices=("check", "deploy"), default="check")
-    a = ap.parse_args(); check_settings(a.host, a.root, a.mode != "check"); files = verify_bundle(Path(a.bundle), a.staging_run_id, a.commit_sha)
+    a = ap.parse_args(); transport.stage('validate approved production destination'); check_settings(a.host, a.root, a.mode != "check"); files = verify_bundle(Path(a.bundle), a.staging_run_id, a.commit_sha)
     print('Offline artifact and destination validation passed')
     transport.operate(a.host, os.environ['PROD_FTPS_USERNAME'], os.environ.get('PROD_FTPS_PASSWORD', ''), a.root, Path(a.bundle), files, a.mode)
 
+def failure_reason(error):
+    # Only fixed validation messages may appear in logs; never echo host or credential values.
+    allowed = {'Invalid release manifest', 'Unsafe release manifest path',
+               'Release SHA-256 verification failed',
+               'Production release contains a staging POS reference',
+               'Staging deployment evidence does not match selected release'}
+    return str(error) if isinstance(error, ValueError) and str(error) in allowed else type(error).__name__
+
 if __name__ == "__main__":
     try: main()
-    except Exception as e: print('FAILED at ' + transport.STAGE + ' (' + type(e).__name__ + '). Review remote state before retry; no automatic recovery.'); raise SystemExit(1)
+    except Exception as e:
+        print('FAILED at ' + transport.STAGE + ': ' + failure_reason(e) + '. Review before retry; no automatic recovery.')
+        raise SystemExit(1)

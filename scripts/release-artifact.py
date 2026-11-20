@@ -3,6 +3,7 @@
 import hashlib, json, os, shutil
 from pathlib import Path
 import importlib.util
+from production_transport import safe_file
 spec = importlib.util.spec_from_file_location("staging", Path(__file__).with_name("website-staging-deploy.py"))
 staging = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(staging)
@@ -11,7 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "artifacts" / "website-release"
 OUT.mkdir(parents=True, exist_ok=True)
 version = os.environ.get("RELEASE_VERSION") or os.environ.get("GITHUB_SHA", "local")
-files = staging.approved_files()
+files = sorted((set(staging.approved_files()) - {"web.config"}) | {"robots.txt", "sitemap.xml"})
+if not all(safe_file(name) for name in files):
+    raise ValueError("Release includes a file blocked by production policy")
 hashes = {}
 for name in files:
     src = ROOT / name
