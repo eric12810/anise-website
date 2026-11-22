@@ -3,6 +3,7 @@
 /image-backups/
 /staging-build/
 /integration-preparation/
+/artifacts/website-release/
 
 # Environment variables, credentials and private keys
 .env
