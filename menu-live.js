@@ -13,7 +13,7 @@
     return node;
   };
   const chineseNames = {
-    'Anise Creations': '創意之作', 'Weekend Special': '週末精選',
+    'Anise Creations': '創意之作', "Weekend Chef's Special": '週末精選',
     'The Little Banquet': '一人小宴', 'Starters': '頭盤', 'Soup': '湯類',
     'Chicken': '雞肉', 'Beef': '牛肉', 'Lamb': '羊肉', 'Seafood': '海鮮',
     'Vegetables': '蔬菜', 'Rice': '飯類', 'Noodles': '麵類', 'Other': '其他',
@@ -61,7 +61,7 @@
     const regularGroups = groups.filter(c => c.name.trim().toLowerCase() !== 'drinks');
     const displayGroups = [
       {name: 'Anise Creations', categories: ['anise creations']},
-      {name: 'Weekend Special', categories: ['weekend special', "weekend chef's special"]},
+      {name: "Weekend Chef's Special", categories: ['weekend special', "weekend chef's special"]},
       {name: 'The Little Banquet', categories: ['the little banquet']},
       {name: 'Starters', categories: ['starters', 'starter', 'soup', 'soups']},
       {name: 'Mains', categories: ['chicken', 'beef', 'lamb', 'seafood', 'vegetables']},
