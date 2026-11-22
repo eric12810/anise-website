@@ -61,7 +61,7 @@
     const regularGroups = groups.filter(c => c.name.trim().toLowerCase() !== 'drinks');
     const displayGroups = [
       {name: 'Anise Creations', categories: ['anise creations']},
-      {name: 'Weekend Special', categories: ['weekend special']},
+      {name: 'Weekend Special', categories: ['weekend special', "weekend chef's special"]},
       {name: 'The Little Banquet', categories: ['the little banquet']},
       {name: 'Starters', categories: ['starters', 'starter', 'soup', 'soups']},
       {name: 'Mains', categories: ['chicken', 'beef', 'lamb', 'seafood', 'vegetables']},
@@ -74,9 +74,7 @@
     sections.filter(c => c.products.length && !c.name.trim().toLowerCase().includes('vegan')).forEach((c, index) => {
       const id = `menu-category-${index}`;
       content.append(section(c.name, c.products, id));
-      const linkName = c.name === 'Weekend Special' || c.name === 'The Little Banquet'
-        ? `${c.name} · ${chineseNames[c.name]}` : c.name;
-      const link = element('a', linkName); link.href = `#${id}`; navigation.append(link);
+      const link = element('a', c.name); link.href = `#${id}`; navigation.append(link);
     });
     if (veganCategories.length) {
       const veganSection = element('section', null, 'vegan-menu-section'); veganSection.id = 'vegan-menu';
