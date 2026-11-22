@@ -13,7 +13,8 @@
     return node;
   };
   const chineseNames = {
-    'Anise Creations': '創意之作', 'Starters': '頭盤', 'Soup': '湯類',
+    'Anise Creations': '創意之作', 'Weekend Special': '週末精選',
+    'The Little Banquet': '一人小宴', 'Starters': '頭盤', 'Soup': '湯類',
     'Chicken': '雞肉', 'Beef': '牛肉', 'Lamb': '羊肉', 'Seafood': '海鮮',
     'Vegetables': '蔬菜', 'Rice': '飯類', 'Noodles': '麵類', 'Other': '其他',
     'Mains': '主菜', 'Sides': '配菜',
@@ -60,6 +61,8 @@
     const regularGroups = groups.filter(c => c.name.trim().toLowerCase() !== 'drinks');
     const displayGroups = [
       {name: 'Anise Creations', categories: ['anise creations']},
+      {name: 'Weekend Special', categories: ['weekend special']},
+      {name: 'The Little Banquet', categories: ['the little banquet']},
       {name: 'Starters', categories: ['starters', 'starter', 'soup', 'soups']},
       {name: 'Mains', categories: ['chicken', 'beef', 'lamb', 'seafood', 'vegetables']},
       {name: 'Sides', categories: ['rice', 'noodles']}
@@ -71,7 +74,9 @@
     sections.filter(c => c.products.length && !c.name.trim().toLowerCase().includes('vegan')).forEach((c, index) => {
       const id = `menu-category-${index}`;
       content.append(section(c.name, c.products, id));
-      const link = element('a', c.name); link.href = `#${id}`; navigation.append(link);
+      const linkName = c.name === 'Weekend Special' || c.name === 'The Little Banquet'
+        ? `${c.name} · ${chineseNames[c.name]}` : c.name;
+      const link = element('a', linkName); link.href = `#${id}`; navigation.append(link);
     });
     if (veganCategories.length) {
       const veganSection = element('section', null, 'vegan-menu-section'); veganSection.id = 'vegan-menu';
